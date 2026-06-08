@@ -367,8 +367,6 @@ body {
 .match-home,
 .match-away { font-size: 14px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 5px; }
 
-.flag-img { display: inline-block; vertical-align: middle; border-radius: 2px; height: 14px; width: auto; flex-shrink: 0; }
-.nm-flag .flag-img { height: 40px; width: auto; border-radius: 4px; }
 
 .match-meta {
   font-size: 11px;

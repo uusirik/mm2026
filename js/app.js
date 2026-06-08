@@ -39,10 +39,10 @@ const TEAM_CODES = {
   'Uzbekistan':'uz','Kolumbia':'co','USA':'us','Paraguay':'py',
 };
 
-function flagImg(team, size = 24) {
+function flagImg(team, size = 15) {
   const code = TEAM_CODES[team];
   if (!code) return '';
-  return `<img class="flag-img" src="https://flagcdn.com/w${size}/${code}.png" alt="${team}" loading="lazy" />`;
+  return `<span class="fi fi-${code}" style="font-size:${size}px;border-radius:2px;vertical-align:middle" title="${team}"></span>`;
 }
 
 // ─── Supabase-apurit ──────────────────────────────────────────────────────────
