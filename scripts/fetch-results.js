@@ -165,25 +165,24 @@ async function veikkausLogin() {
 }
 
 async function fetchVeikkausOdds(cookie) {
-  // Debug: listaa saatavilla olevat pelityypit
-  const gamesRes = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games`, {
-    headers: { ...VEIKKAUS_HEADERS, Cookie: cookie },
-  });
-  console.log(`Veikkaus /games status: ${gamesRes.status}`);
-  if (gamesRes.ok) {
-    const gamesText = await gamesRes.text();
-    console.log('Veikkaus /games:', gamesText.slice(0, 800));
+  const hdrs = { ...VEIKKAUS_HEADERS, Cookie: cookie };
+  const probe = [
+    '/sport-open-games/v1/draws?game=EBET',
+    '/sport-open-games/v2/games/EBET/draws',
+    '/sport-open-games/v1/games/EBET',
+    '/bff/v1/sport-games/EBET/draws',
+  ];
+  for (const path of probe) {
+    const r = await fetch(`${VEIKKAUS_API}${path}`, { headers: hdrs });
+    const t = await r.text();
+    console.log(`${path} → ${r.status}: ${t.slice(0, 200)}`);
   }
 
   const res = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games/EBET/draws`, {
-    headers: { ...VEIKKAUS_HEADERS, Cookie: cookie },
+    headers: hdrs,
   });
-  console.log(`Veikkaus draws status: ${res.status}`);
-  if (res.status === 204) { console.warn('Veikkaus: 204 ei sisältöä'); return []; }
-  if (!res.ok) { console.warn(`Veikkaus: HTTP-virhe ${res.status}`); return []; }
-  const text = await res.text();
-  console.log('Veikkaus raw (500 merkkiä):', text.slice(0, 500));
-  const data = JSON.parse(text);
+  if (res.status === 204 || !res.ok) { console.warn(`Veikkaus: ${res.status}`); return []; }
+  const data = JSON.parse(await res.text());
   // Pura kaikki 1X2-rivit
   const games = [];
   for (const draw of (data.draws ?? [])) {
