@@ -23,6 +23,22 @@ let state = {
   saveTimers: {},
 };
 
+// ─── Joukkueiden liput ────────────────────────────────────────────────────────
+const TEAM_FLAGS = {
+  'Meksiko':'🇲🇽','Etelä-Afrikka':'🇿🇦','Etelä-Korea':'🇰🇷','Tšekki':'🇨🇿',
+  'Kanada':'🇨🇦','Bosnia & Hertsegovina':'🇧🇦','Qatar':'🇶🇦','Sveitsi':'🇨🇭',
+  'Brasilia':'🇧🇷','Marokko':'🇲🇦','Haiti':'🇭🇹','Skotlanti':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'Australia':'🇦🇺','Turkki':'🇹🇷','Saksa':'🇩🇪','Curaçao':'🇨🇼',
+  'Alankomaat':'🇳🇱','Japani':'🇯🇵','Norsunluurannikko':'🇨🇮','Ecuador':'🇪🇨',
+  'Ruotsi':'🇸🇪','Tunisia':'🇹🇳','Espanja':'🇪🇸','Kap Verde':'🇨🇻',
+  'Belgia':'🇧🇪','Egypti':'🇪🇬','Saudi-Arabia':'🇸🇦','Uruguay':'🇺🇾',
+  'Iran':'🇮🇷','Uusi-Seelanti':'🇳🇿','Ranska':'🇫🇷','Senegal':'🇸🇳',
+  'Irak':'🇮🇶','Norja':'🇳🇴','Argentiina':'🇦🇷','Algeria':'🇩🇿',
+  'Itävalta':'🇦🇹','Jordania':'🇯🇴','Portugali':'🇵🇹','Kongon DT':'🇨🇩',
+  'Englanti':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Kroatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
+  'Uzbekistan':'🇺🇿','Kolumbia':'🇨🇴','USA':'🇺🇸','Paraguay':'🇵🇾',
+};
+
 // ─── Supabase-apurit ──────────────────────────────────────────────────────────
 async function loadMatches() {
   const { data } = await sb.from('matches').select('*').order('kickoff');
@@ -287,6 +303,93 @@ function renderView() {
   else if (state.view === 'news')        renderNews(el);
 }
 
+// ─── Seuraava ottelu -kortti ──────────────────────────────────────────────────
+let _countdownTimer = null;
+
+function getNextMatch() {
+  const list = state.matches.length ? state.matches : MATCHES;
+  return list
+    .filter(m => !m.result && new Date(m.kickoff || m.dt) > Date.now() - 2 * 36e5)
+    .sort((a, b) => new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt))[0] || null;
+}
+
+function renderNextMatchCard() {
+  const m = getNextMatch();
+  if (!m) return '';
+
+  const home    = m.home  || m.h;
+  const away    = m.away  || m.a;
+  const kickoff = m.kickoff || m.dt;
+  const group   = m.group_name || m.g;
+  const mData   = getMatchData(m.id);
+  const bet     = state.bets[m.id];
+
+  const hasOdds = mData?.odds_home && mData?.odds_draw && mData?.odds_away;
+  const oddsHtml = hasOdds ? `
+    <div class="nm-odds">
+      <div class="nm-odds-item"><span class="nm-odds-lbl">1</span><span class="nm-odds-val">${mData.odds_home}</span></div>
+      <div class="nm-odds-sep">·</div>
+      <div class="nm-odds-item"><span class="nm-odds-lbl">X</span><span class="nm-odds-val">${mData.odds_draw}</span></div>
+      <div class="nm-odds-sep">·</div>
+      <div class="nm-odds-item"><span class="nm-odds-lbl">2</span><span class="nm-odds-val">${mData.odds_away}</span></div>
+    </div>` : '';
+
+  const actionHtml = bet
+    ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
+    : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`;
+
+  return `
+    <div class="next-match-card">
+      <div class="nm-header">
+        <span class="nm-label">SEURAAVA OTTELU</span>
+        <span class="nm-group">Lohko ${group}</span>
+      </div>
+      <div class="nm-teams">
+        <div class="nm-team">
+          <span class="nm-flag">${TEAM_FLAGS[home] || ''}</span>
+          <span class="nm-name">${home}</span>
+        </div>
+        <div class="nm-center">
+          <div class="nm-vs">VS</div>
+          <div class="nm-countdown" data-kickoff="${kickoff}">–</div>
+        </div>
+        <div class="nm-team">
+          <span class="nm-flag">${TEAM_FLAGS[away] || ''}</span>
+          <span class="nm-name">${away}</span>
+        </div>
+      </div>
+      ${oddsHtml}
+      <div class="nm-footer">
+        <span class="nm-date">${fmtDate(kickoff)}</span>
+        ${actionHtml}
+      </div>
+    </div>`;
+}
+
+function startCountdown() {
+  if (_countdownTimer) clearInterval(_countdownTimer);
+  _countdownTimer = setInterval(tickCountdowns, 1000);
+  tickCountdowns();
+}
+
+function tickCountdowns() {
+  document.querySelectorAll('.nm-countdown[data-kickoff]').forEach(el => {
+    const diff = new Date(el.dataset.kickoff) - Date.now();
+    if (diff <= 0) {
+      el.textContent = '⚽ Käynnissä';
+      el.classList.add('live');
+      return;
+    }
+    const d = Math.floor(diff / 864e5);
+    const h = Math.floor((diff % 864e5) / 36e5);
+    const min = Math.floor((diff % 36e5) / 6e4);
+    const s   = Math.floor((diff % 6e4) / 1e3);
+    if (d > 0)       el.textContent = `${d} pv ${h} t`;
+    else if (h > 0)  el.textContent = `${h} t ${min} min`;
+    else             el.textContent = `${min}:${String(s).padStart(2,'0')}`;
+  });
+}
+
 // ─── Veikkausnäkymä ───────────────────────────────────────────────────────────
 function renderBets(el) {
   const matchList = state.matches.length ? state.matches : MATCHES;
@@ -318,6 +421,7 @@ function renderBets(el) {
     }).join('');
 
   el.innerHTML = `
+    ${renderNextMatchCard()}
     <div class="stats-row">
       <div class="stat-card"><div class="stat-val">${betCnt}</div><div class="stat-lbl">Veikattu</div></div>
       <div class="stat-card"><div class="stat-val">${openCnt}</div><div class="stat-lbl">Avoinna</div></div>
@@ -335,6 +439,8 @@ function renderBets(el) {
       <span class="filter-count">${filtered.length} ottelua</span>
     </div>
     ${groupsHtml || '<div class="loading">Ei otteluita.</div>'}`;
+
+  startCountdown();
 
   // Kiinnitetään goal-inputtien event-handlerit
   el.querySelectorAll('.goal-input').forEach(inp => {
@@ -608,6 +714,18 @@ window.app = {
       toast(msg, true);
       reset();
     }
+  },
+
+  scrollToMatch(matchId) {
+    state.filter = 'all';
+    renderView();
+    setTimeout(() => {
+      const el = document.getElementById(`card-${matchId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('highlight');
+      setTimeout(() => el.classList.remove('highlight'), 1800);
+    }, 80);
   },
 
   setFilter(f) {
