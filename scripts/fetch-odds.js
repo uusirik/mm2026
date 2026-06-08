@@ -63,16 +63,21 @@ const TEAM_MAP = {
 
 // Lisäsynonyymit joita The Odds API saattaa käyttää
 const ALIASES = {
-  'czechia':          'czech republic',
-  'united states':    'usa',
-  'ivory coast':      'ivory coast',
-  "cote d'ivoire":    'ivory coast',
-  'democratic republic of congo': 'dr congo',
-  'congo dr':         'dr congo',
+  'czechia':                       'czech republic',
+  'united states':                 'usa',
+  'ivory coast':                   'ivory coast',
+  "cote divoire":                  'ivory coast',
+  'democratic republic of congo':  'dr congo',
+  'congo dr':                      'dr congo',
+  'bosnia herzegovina':            'bosnia',
+  'bosnia and herzegovina':        'bosnia',
 };
 
 function normalize(s) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (s || '').toLowerCase()
+    .normalize('NFD')               // ç → c + yhdistävä serkka
+    .replace(/[̀-ͯ]/g, '') // poista diakriitit
+    .replace(/[^a-z0-9]/g, '');
 }
 
 // Rakenna EN (normalisoitu) → FI-hakemisto
