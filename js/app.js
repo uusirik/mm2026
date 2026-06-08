@@ -112,17 +112,17 @@ function nameToEmail(name) {
   return `${slug}@afry2026.test`;
 }
 
-// Salasana = rekisteröintitunnus + PIN
-function makePassword(fragment, pin) {
-  return `${fragment}-${pin}`;
+// Salasana = kiinteä prefix + PIN (ei riipu kutsulinkkistä)
+function makePassword(pin) {
+  return `MM26vk-${pin}`;
 }
 
 async function signInOrRegister(displayName, pin) {
   const inviteCode = localStorage.getItem('mm2026_invite_fragment') || '';
   const email    = nameToEmail(displayName);
-  const password = makePassword(inviteCode || 'noinvite', pin);
+  const password = makePassword(pin);
 
-  // Yritetään kirjautua — onnistuu paluukerroilla
+  // Yritetään kirjautua — onnistuu paluukerroilla millä laitteella tahansa
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
