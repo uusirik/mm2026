@@ -165,6 +165,16 @@ async function veikkausLogin() {
 }
 
 async function fetchVeikkausOdds(cookie) {
+  // Debug: listaa saatavilla olevat pelityypit
+  const gamesRes = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games`, {
+    headers: { ...VEIKKAUS_HEADERS, Cookie: cookie },
+  });
+  console.log(`Veikkaus /games status: ${gamesRes.status}`);
+  if (gamesRes.ok) {
+    const gamesText = await gamesRes.text();
+    console.log('Veikkaus /games:', gamesText.slice(0, 800));
+  }
+
   const res = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games/EBET/draws`, {
     headers: { ...VEIKKAUS_HEADERS, Cookie: cookie },
   });
