@@ -327,30 +327,40 @@ function renderBets(el) {
 
   // Kiinnitetään goal-inputtien event-handlerit
   el.querySelectorAll('.goal-input').forEach(inp => {
-    inp.addEventListener('change', () => {
-      const matchId = inp.dataset.match;
-      const side    = inp.dataset.side;
-      const val     = Math.max(0, Math.min(99, parseInt(inp.value) || 0));
-      inp.value = val;
-      if (!state.bets[matchId]) return;
-      state.bets[matchId][side === 'home' ? 'home_goals' : 'away_goals'] = val;
-      debounceSave(matchId);
-      updateMatchCardPoints(matchId);
-    });
+    inp.addEventListener('change', () => handleGoalInput(inp));
+    inp.addEventListener('input',  () => handleGoalInput(inp));
   });
 }
 
+function handleGoalInput(inp) {
+  const matchId = inp.dataset.match;
+  const side    = inp.dataset.side;
+  const raw     = inp.value.trim();
+  if (raw === '') return;
+  const val = Math.max(0, Math.min(99, parseInt(raw) || 0));
+  inp.value = val;
+
+  const prev = state.bets[matchId] || { home_goals: 0, away_goals: 0 };
+  const home = side === 'home' ? val : prev.home_goals ?? 0;
+  const away = side === 'away' ? val : prev.away_goals ?? 0;
+  const prediction = home > away ? '1' : away > home ? '2' : 'x';
+
+  state.bets[matchId] = { prediction, home_goals: home, away_goals: away };
+  updateMatchCardPoints(matchId);
+  debounceSave(matchId);
+  updateStats();
+}
+
 function renderMatchCard(m) {
-  const matchId  = m.id;
-  const locked   = isLocked(m);
-  const bet      = state.bets[matchId];
-  const mData    = getMatchData(matchId);
-  const res      = matchResult(mData);
-  const ptsObj   = bet && mData?.result ? calcPoints(bet, mData) : null;
+  const matchId = m.id;
+  const locked  = isLocked(m);
+  const bet     = state.bets[matchId];
+  const mData   = getMatchData(matchId);
+  const res     = matchResult(mData);
+  const ptsObj  = bet && mData?.result ? calcPoints(bet, mData) : null;
 
   const metaParts = [fmtDate(m.dt || m.kickoff)];
-  if (res) metaParts.push(`Tulos: ${res.score} (${res.label})`);
-
+  if (res) metaParts.push(`Tulos: ${res.score}`);
   const metaHtml = `<div class="match-meta">${metaParts.join(' · ')}</div>`;
 
   let actionHtml = '';
@@ -372,26 +382,15 @@ function renderMatchCard(m) {
   } else {
     const hg = bet?.home_goals ?? '';
     const ag = bet?.away_goals ?? '';
-    const goalsVisible = bet ? 'visible' : '';
     actionHtml = `
-      <div class="bet-block">
-        <div class="result-btns">
-          <button class="result-btn ${bet?.prediction==='1'?'sel-1':''}"
-            onclick="app.setBet('${matchId}','1')" aria-label="Koti voittaa">1</button>
-          <button class="result-btn ${bet?.prediction==='x'?'sel-x':''}"
-            onclick="app.setBet('${matchId}','x')" aria-label="Tasapeli">X</button>
-          <button class="result-btn ${bet?.prediction==='2'?'sel-2':''}"
-            onclick="app.setBet('${matchId}','2')" aria-label="Vieras voittaa">2</button>
-        </div>
-        <div class="goals-block ${goalsVisible}" id="goals-${matchId}">
-          <input type="number" class="goal-input" min="0" max="99"
-            data-match="${matchId}" data-side="home"
-            value="${hg}" placeholder="0" />
-          <span class="goals-sep">–</span>
-          <input type="number" class="goal-input" min="0" max="99"
-            data-match="${matchId}" data-side="away"
-            value="${ag}" placeholder="0" />
-        </div>
+      <div class="goals-block">
+        <input type="number" class="goal-input" min="0" max="99"
+          data-match="${matchId}" data-side="home"
+          value="${hg}" placeholder="0" />
+        <span class="goals-sep">–</span>
+        <input type="number" class="goal-input" min="0" max="99"
+          data-match="${matchId}" data-side="away"
+          value="${ag}" placeholder="0" />
       </div>`;
   }
 
@@ -530,48 +529,6 @@ window.app = {
       btn.disabled = false;
       btn.textContent = 'Kirjaudu →';
     }
-  },
-
-  setBet(matchId, prediction) {
-    const match = getMatchData(matchId);
-    if (!match || isLocked(match)) return;
-
-    if (state.bets[matchId]?.prediction === prediction) {
-      delete state.bets[matchId];
-    } else {
-      const prev = state.bets[matchId] || {};
-      state.bets[matchId] = {
-        prediction,
-        home_goals: prev.home_goals ?? 0,
-        away_goals: prev.away_goals ?? 0,
-      };
-    }
-
-    // Päivitä vain tämä kortti (ei full re-render)
-    const card = document.getElementById(`card-${matchId}`);
-    if (card) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = renderMatchCard(match);
-      const newCard = tmp.firstElementChild;
-      card.replaceWith(newCard);
-      newCard.querySelectorAll('.goal-input').forEach(inp => {
-        inp.addEventListener('change', () => {
-          const mid  = inp.dataset.match;
-          const side = inp.dataset.side;
-          const val  = Math.max(0, Math.min(99, parseInt(inp.value) || 0));
-          inp.value = val;
-          if (!state.bets[mid]) return;
-          state.bets[mid][side === 'home' ? 'home_goals' : 'away_goals'] = val;
-          debounceSave(mid);
-        });
-      });
-      // Näytä goals-block heti valinnan jälkeen
-      const gb = document.getElementById(`goals-${matchId}`);
-      if (gb && state.bets[matchId]) gb.classList.add('visible');
-    }
-
-    if (state.bets[matchId]) debounceSave(matchId);
-    updateStats();
   },
 
   setFilter(f) {
