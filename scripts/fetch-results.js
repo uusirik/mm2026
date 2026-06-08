@@ -71,6 +71,7 @@ const ALIASES = {
   'republicofcongo':              'drcongo',
   'bosnia':                       'bosnia',
   'bosniaandherzegovina':         'bosnia',
+  'bosniaherzegovina':            'bosnia',
 };
 
 function normalize(s) {
