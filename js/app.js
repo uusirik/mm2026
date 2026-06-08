@@ -216,25 +216,8 @@ function renderTopbar() {
 }
 
 async function renderAuth(root) {
-  const invited = await checkInvite();
-
-  if (!invited) {
-    root.innerHTML = `
-      <div class="auth-wrap">
-        <div class="auth-logo-area">
-          <span class="auth-logo-icon">⚽</span>
-          <div class="auth-brand">MM 2026</div>
-          <div class="auth-tagline">Veikkaus &nbsp;·&nbsp; AFRY</div>
-        </div>
-        <div class="auth-card">
-          <div class="auth-sub" style="text-align:center;padding:0.5rem 0">
-            Tarvitset kutsulinkkin päästäksesi sivustolle.<br>
-            <span style="color:rgba(255,255,255,0.2);font-size:11px">Ota yhteyttä ryhmän ylläpitäjään.</span>
-          </div>
-        </div>
-      </div>`;
-    return;
-  }
+  // Tallenna kutsukoodi URL-fragmentista jos se löytyy
+  await checkInvite();
 
   root.innerHTML = `
     <div class="auth-wrap">
@@ -244,7 +227,7 @@ async function renderAuth(root) {
         <div class="auth-tagline">Veikkaus &nbsp;·&nbsp; Kirjaudu sisään</div>
       </div>
       <div class="auth-card" id="auth-card">
-        <div class="auth-sub">Syötä nimesi ja PIN-koodi.</div>
+        <div class="auth-sub">Kirjaudu nimellä ja PIN-koodilla. Uusi käyttäjä? Tarvitset kutsulinkkin.</div>
         <div class="field">
           <label for="inp-name">Nimi</label>
           <input type="text" id="inp-name" placeholder="Etunimi Sukunimi" autocomplete="name" />
