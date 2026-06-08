@@ -174,7 +174,7 @@ function getTotalPoints() {
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
-function renderAll() {
+async function renderAll() {
   renderTopbar();
 
   const session = state.user;
@@ -182,7 +182,7 @@ function renderAll() {
 
   if (!session) {
     document.querySelector('.topbar').style.display = 'none';
-    renderAuth(root);
+    await renderAuth(root);
     return;
   }
   document.querySelector('.topbar').style.display = '';
