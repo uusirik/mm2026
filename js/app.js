@@ -587,7 +587,6 @@ const NEWS_FEEDS = [
   { name: 'IS Urheilu',   url: 'https://www.is.fi/rss/urheilu.xml' },
   { name: 'IL Urheilu',   url: 'https://www.iltalehti.fi/rss/urheilu.xml' },
   { name: 'HS Urheilu',   url: 'https://www.hs.fi/rss/urheilu.xml' },
-  { name: 'MTV Urheilu',  url: 'https://www.mtvuutiset.fi/rss/urheilu' },
 ];
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
 const NEWS_CACHE_MS = 10 * 60 * 1000;
