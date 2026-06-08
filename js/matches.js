@@ -117,7 +117,7 @@ export const MATCHES = [
   {id:'3P',g:'3P',h:'TBD',a:'TBD',dt:'2026-07-18T19:00:00Z',tbd:true},
 
   // Finaali
-  {id:'FIN',g:'F',h:'TBD',a:'TBD',dt:'2026-07-19T19:00:00Z',tbd:true},
+  {id:'FIN',g:'FIN',h:'TBD',a:'TBD',dt:'2026-07-19T19:00:00Z',tbd:true},
 ];
 
 /**

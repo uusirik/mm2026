@@ -309,7 +309,13 @@ let _countdownTimer = null;
 const GROUP_LABELS = {
   R32: 'Viimeinen 32', R16: 'Viimeinen 16',
   QF:  'Puolivälierät', SF: 'Välierät',
-  '3P': 'Pronssiottelu', F: 'Finaali',
+  '3P': 'Pronssiottelu', FIN: 'Finaali',
+};
+
+// Järjestys lohkoille renderöinnissä
+const GROUP_ORDER = {
+  A:1, B:2, C:3, D:4, E:5, F:6, G:7, H:8, I:9, J:10, K:11, L:12,
+  R32:13, R16:14, QF:15, SF:16, '3P':17, FIN:18,
 };
 
 function getNextMatch() {
@@ -421,12 +427,12 @@ function renderBets(el) {
   });
 
   const groupsHtml = Object.entries(groups)
-    .sort(([a],[b]) => a.localeCompare(b))
+    .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
     .map(([g, ms]) => {
+      const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
+      const isKnockout = !!GROUP_LABELS[g];
       const rows = ms.map(m => renderMatchCard(m)).join('');
-      const label = GROUP_LABELS[g] ? GROUP_LABELS[g] : `Lohko ${g}`;
-      const isTbdSection = !!GROUP_LABELS[g];
-      return `<div class="group-block"><div class="group-label ${isTbdSection?'knockout-label':''}">${label}</div>${rows}</div>`;
+      return `<div class="group-block"><div class="group-label ${isKnockout?'knockout-label':''}">${label}</div>${rows}</div>`;
     }).join('');
 
   el.innerHTML = `
@@ -479,6 +485,9 @@ function handleGoalInput(inp) {
 
 function renderMatchCard(m) {
   const matchId = m.id;
+
+  const home = m.home || m.h;
+  const away = m.away || m.a;
 
   // TBD-ottelu — ei vielä veikattavissa
   if (m.tbd) {
@@ -547,8 +556,8 @@ function renderMatchCard(m) {
   return `
     <div class="match-card ${locked?'locked':''} ${bet?'has-bet':''}" id="card-${matchId}">
       <div class="match-teams">
-        <span class="match-home">${m.home || m.h}</span>
-        <span class="match-away">${m.away || m.a}</span>
+        <span class="match-home">${TEAM_FLAGS[home] ? TEAM_FLAGS[home]+' ' : ''}${home}</span>
+        <span class="match-away">${TEAM_FLAGS[away] ? TEAM_FLAGS[away]+' ' : ''}${away}</span>
         ${metaHtml}
         ${oddsHtml}
       </div>

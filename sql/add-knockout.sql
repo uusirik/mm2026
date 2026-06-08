@@ -41,5 +41,5 @@ insert into public.matches (id, group_name, home, away, kickoff, tbd) values
 -- Pronssiottelu
 ('3P','3P','TBD','TBD','2026-07-18T19:00:00Z',true),
 -- Finaali
-('FIN','F','TBD','TBD','2026-07-19T19:00:00Z',true)
+('FIN','FIN','TBD','TBD','2026-07-19T19:00:00Z',true)
 on conflict (id) do nothing;
