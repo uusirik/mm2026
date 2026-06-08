@@ -129,7 +129,7 @@ async function signInOrRegister(displayName, pin) {
   // Kirjautuminen epäonnistui — yritetään rekisteröidä uutena käyttäjänä
   if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
 
-  const { data, error: signUpErr } = await sb.auth.signUp({
+  const { error: signUpErr } = await sb.auth.signUp({
     email,
     password,
     options: { data: { display_name: displayName } },
@@ -142,7 +142,9 @@ async function signInOrRegister(displayName, pin) {
     return signUpErr;
   }
 
-  return null;
+  // Kirjaudu sisään heti rekisteröinnin jälkeen
+  const { error: signInAfterErr } = await sb.auth.signInWithPassword({ email, password });
+  return signInAfterErr ?? null;
 }
 
 async function signOut() {
