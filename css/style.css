@@ -365,7 +365,10 @@ body {
 .match-teams { display: flex; flex-direction: column; gap: 1px; }
 
 .match-home,
-.match-away { font-size: 14px; font-weight: 500; color: var(--text); }
+.match-away { font-size: 14px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 5px; }
+
+.flag-img { display: inline-block; vertical-align: middle; border-radius: 2px; height: 14px; width: auto; flex-shrink: 0; }
+.nm-flag .flag-img { height: 40px; width: auto; border-radius: 4px; }
 
 .match-meta {
   font-size: 11px;
@@ -617,7 +620,7 @@ body {
   text-align: center;
 }
 
-.nm-flag { font-size: 38px; line-height: 1; }
+.nm-flag { line-height: 1; display: flex; align-items: center; justify-content: center; }
 
 .nm-name {
   font-size: 13px;
@@ -791,7 +794,7 @@ body {
 
   /* Ottelukortti — pidä kaksipalstainen, isommat inputit */
   .match-card { padding: 12px; }
-  .match-home, .match-away { font-size: 13px; }
+  .match-home, .match-away { font-size: 13px; gap: 4px; }
   .goal-input { width: 48px; height: 42px; font-size: 17px; }
 
   /* Pistetaulukko — piilota "Tarkat"-sarake */

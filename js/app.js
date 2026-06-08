@@ -23,21 +23,27 @@ let state = {
   saveTimers: {},
 };
 
-// ─── Joukkueiden liput ────────────────────────────────────────────────────────
-const TEAM_FLAGS = {
-  'Meksiko':'🇲🇽','Etelä-Afrikka':'🇿🇦','Etelä-Korea':'🇰🇷','Tšekki':'🇨🇿',
-  'Kanada':'🇨🇦','Bosnia & Hertsegovina':'🇧🇦','Qatar':'🇶🇦','Sveitsi':'🇨🇭',
-  'Brasilia':'🇧🇷','Marokko':'🇲🇦','Haiti':'🇭🇹','Skotlanti':'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-  'Australia':'🇦🇺','Turkki':'🇹🇷','Saksa':'🇩🇪','Curaçao':'🇨🇼',
-  'Alankomaat':'🇳🇱','Japani':'🇯🇵','Norsunluurannikko':'🇨🇮','Ecuador':'🇪🇨',
-  'Ruotsi':'🇸🇪','Tunisia':'🇹🇳','Espanja':'🇪🇸','Kap Verde':'🇨🇻',
-  'Belgia':'🇧🇪','Egypti':'🇪🇬','Saudi-Arabia':'🇸🇦','Uruguay':'🇺🇾',
-  'Iran':'🇮🇷','Uusi-Seelanti':'🇳🇿','Ranska':'🇫🇷','Senegal':'🇸🇳',
-  'Irak':'🇮🇶','Norja':'🇳🇴','Argentiina':'🇦🇷','Algeria':'🇩🇿',
-  'Itävalta':'🇦🇹','Jordania':'🇯🇴','Portugali':'🇵🇹','Kongon DT':'🇨🇩',
-  'Englanti':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Kroatia':'🇭🇷','Ghana':'🇬🇭','Panama':'🇵🇦',
-  'Uzbekistan':'🇺🇿','Kolumbia':'🇨🇴','USA':'🇺🇸','Paraguay':'🇵🇾',
+// ─── Joukkueiden liput (flagcdn.com kuvat — toimii kaikilla alustoilla) ───────
+const TEAM_CODES = {
+  'Meksiko':'mx','Etelä-Afrikka':'za','Etelä-Korea':'kr','Tšekki':'cz',
+  'Kanada':'ca','Bosnia & Hertsegovina':'ba','Qatar':'qa','Sveitsi':'ch',
+  'Brasilia':'br','Marokko':'ma','Haiti':'ht','Skotlanti':'gb-sct',
+  'Australia':'au','Turkki':'tr','Saksa':'de','Curaçao':'cw',
+  'Alankomaat':'nl','Japani':'jp','Norsunluurannikko':'ci','Ecuador':'ec',
+  'Ruotsi':'se','Tunisia':'tn','Espanja':'es','Kap Verde':'cv',
+  'Belgia':'be','Egypti':'eg','Saudi-Arabia':'sa','Uruguay':'uy',
+  'Iran':'ir','Uusi-Seelanti':'nz','Ranska':'fr','Senegal':'sn',
+  'Irak':'iq','Norja':'no','Argentiina':'ar','Algeria':'dz',
+  'Itävalta':'at','Jordania':'jo','Portugali':'pt','Kongon DT':'cd',
+  'Englanti':'gb-eng','Kroatia':'hr','Ghana':'gh','Panama':'pa',
+  'Uzbekistan':'uz','Kolumbia':'co','USA':'us','Paraguay':'py',
 };
+
+function flagImg(team, size = 24) {
+  const code = TEAM_CODES[team];
+  if (!code) return '';
+  return `<img class="flag-img" src="https://flagcdn.com/w${size}/${code}.png" alt="${team}" loading="lazy" />`;
+}
 
 // ─── Supabase-apurit ──────────────────────────────────────────────────────────
 async function loadMatches() {
@@ -358,7 +364,7 @@ function renderNextMatchCard() {
       </div>
       <div class="nm-teams">
         <div class="nm-team">
-          <span class="nm-flag">${TEAM_FLAGS[home] || ''}</span>
+          <span class="nm-flag">${flagImg(home, 48)}</span>
           <span class="nm-name">${home}</span>
         </div>
         <div class="nm-center">
@@ -366,7 +372,7 @@ function renderNextMatchCard() {
           <div class="nm-countdown" data-kickoff="${kickoff}">–</div>
         </div>
         <div class="nm-team">
-          <span class="nm-flag">${TEAM_FLAGS[away] || ''}</span>
+          <span class="nm-flag">${flagImg(away, 48)}</span>
           <span class="nm-name">${away}</span>
         </div>
       </div>
@@ -556,8 +562,8 @@ function renderMatchCard(m) {
   return `
     <div class="match-card ${locked?'locked':''} ${bet?'has-bet':''}" id="card-${matchId}">
       <div class="match-teams">
-        <span class="match-home">${TEAM_FLAGS[home] ? TEAM_FLAGS[home]+' ' : ''}${home}</span>
-        <span class="match-away">${TEAM_FLAGS[away] ? TEAM_FLAGS[away]+' ' : ''}${away}</span>
+        <span class="match-home">${flagImg(home)}${home}</span>
+        <span class="match-away">${flagImg(away)}${away}</span>
         ${metaHtml}
         ${oddsHtml}
       </div>
@@ -577,8 +583,11 @@ function updateMatchCardPoints(matchId) {
 
 // ─── Uutiset ──────────────────────────────────────────────────────────────────
 const NEWS_FEEDS = [
-  { name: 'MM 2026',    url: 'https://news.google.com/rss/search?q=FIFA+World+Cup+2026+jalkapallo&hl=fi&gl=FI&ceid=FI:fi' },
-  { name: 'YLE Urheilu', url: 'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU' },
+  { name: 'YLE Urheilu',  url: 'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU' },
+  { name: 'IS Urheilu',   url: 'https://www.is.fi/rss/urheilu.xml' },
+  { name: 'IL Urheilu',   url: 'https://www.iltalehti.fi/rss/urheilu.xml' },
+  { name: 'HS Urheilu',   url: 'https://www.hs.fi/rss/urheilu.xml' },
+  { name: 'MTV Urheilu',  url: 'https://www.mtvuutiset.fi/rss/urheilu' },
 ];
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
 const NEWS_CACHE_MS = 10 * 60 * 1000;
@@ -715,13 +724,16 @@ async function renderOthers(el) {
             <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>
           </div>`;
         }).filter(Boolean).join('');
+        if (!chips) return '';
         return `
           <div class="group-block" style="margin-bottom:1rem">
-            <div class="group-label" style="margin-bottom:4px">${m.home||m.h} – ${m.away||m.a} <span style="font-weight:400;color:var(--c-text3)">${fmtDate(m.dt||m.kickoff)}</span></div>
-            <div class="others-grid">${chips || '<span style="font-size:12px;color:var(--c-text3)">Ei veikkauksia</span>'}</div>
+            <div class="group-label" style="margin-bottom:4px">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a} <span style="font-weight:400;color:var(--c-text3)">${fmtDate(m.dt||m.kickoff)}</span></div>
+            <div class="others-grid">${chips}</div>
           </div>`;
-      }).join('');
-      return `<div style="margin-bottom:1.5rem"><div class="group-label" style="font-size:13px;margin-bottom:8px">Lohko ${g}</div>${rows}</div>`;
+      }).filter(Boolean).join('');
+      if (!rows) return '';
+      const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
+      return `<div style="margin-bottom:1.5rem"><div class="group-label" style="font-size:13px;margin-bottom:8px">${label}</div>${rows}</div>`;
     }).join('');
   })();
 
