@@ -1,0 +1,22 @@
+name: Fetch Match Results
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # joka 30. minuutti
+  workflow_dispatch:           # voi ajaa käsin
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Hae ja päivitä tulokset
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/fetch-results.js

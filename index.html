@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MM 2026 Veikkaus</title>
+  <meta name="description" content="FIFA MM 2026 kisaveikkaus — veikkaa alkusarjan otteluiden tulokset" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- Yläpalkki -->
+  <header class="topbar">
+    <a class="topbar-logo" href="#">
+      ⚽ MM 2026 <span>Veikkaus</span>
+    </a>
+    <div class="topbar-right">
+      <div id="topbar-nav"></div>
+      <div id="topbar-user"></div>
+    </div>
+  </header>
+
+  <!-- Pääsisältö -->
+  <div id="app-root">
+    <div class="loading">
+      <div class="spinner"></div>
+      Ladataan…
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast-ilmoitukset -->
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<!-- Sovellus ES-moduulina -->
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
