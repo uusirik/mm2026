@@ -3,7 +3,7 @@
 FIFA MM 2026 -kisaveikkaussivusto kollegoille. Veikkaa kaikkien 72 alkusarjaottelun tulokset — sulkeutuu automaattisesti ottelun alkaessa. Jatkosarjaottelut avautuvat veikattavaksi kun otteluparit selviävät.
 
 **Sivusto:** [uusirik.github.io/mm2026](https://uusirik.github.io/mm2026/)  
-**Pääsy:** Kutsulinkin kautta (`(kutsukoodi)`)
+**Pääsy:** Kutsulinkin kautta (jaetaan erikseen)
 
 ---
 
@@ -80,8 +80,7 @@ const SUPABASE_ANON = 'eyJhbGci...';
 
 ### 4. Kutsulinkin jako
 
-Rekisteröityminen vaatii linkin: `https://uusirik.github.io/mm2026/(kutsukoodi)`  
-Kutsukoodi on vain URL-fragmentissa — sitä ei lähetetä palvelimelle.
+Rekisteröityminen vaatii kutsulinkkin. Lisää oma kutsukoodi `js/app.js`-tiedostossa olevaan `INVITE_HASHES`-listaan SHA-256-tiivisteenä — koodi itse ei tallennu palvelimelle.
 
 ---
 
