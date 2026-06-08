@@ -533,12 +533,74 @@ body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Mobiilialanavigaatio ────────────────────────────────────────────────────── */
+.bottom-nav {
+  display: none;
+}
+
+.bnav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color 0.15s;
+  min-height: 56px;
+}
+
+.bnav-tab.active { color: var(--indigo); }
+.bnav-tab:not(.active):active { color: var(--text2); }
+
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .topbar { padding: 0 1rem; }
-  .main-content { padding: 1rem 0.75rem 3rem; }
+  .topbar-logo span { display: none; }
+  .nav-tabs { display: none; }
+
+  /* Sisältöalue — jätä tilaa alanavigaatiolle */
+  .main-content { padding: 1rem 0.75rem 5.5rem; }
+
+  /* Ottelukortti — pidä kaksipalstainen, isommat inputit */
+  .match-card { padding: 12px; }
+  .match-home, .match-away { font-size: 13px; }
+  .goal-input { width: 48px; height: 42px; font-size: 17px; }
+
+  /* Pistetaulukko — piilota "Tarkat"-sarake */
   .lb-header, .lb-row { grid-template-columns: 28px 1fr 52px 80px; }
   .lb-header > *:nth-child(4), .lb-row > *:nth-child(4) { display: none; }
-  .match-card { grid-template-columns: 1fr; gap: 8px; }
-  .topbar-logo span { display: none; }
+
+  /* Filterit vierivät vaakatasossa */
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-count { flex-shrink: 0; }
+  .filter-btn { flex-shrink: 0; padding: 6px 14px; font-size: 13px; }
+
+  /* Alanavigaatio näkyy mobiilissa */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(19,23,32,0.96);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

@@ -191,13 +191,15 @@ async function renderAll() {
 }
 
 function renderTopbar() {
-  const nav = document.getElementById('topbar-nav');
-  const usr = document.getElementById('topbar-user');
+  const nav  = document.getElementById('topbar-nav');
+  const usr  = document.getElementById('topbar-user');
+  const bnav = document.getElementById('bottom-nav');
   if (!nav || !usr) return;
 
   if (!state.user) {
-    nav.innerHTML = '';
-    usr.innerHTML = '';
+    nav.innerHTML  = '';
+    usr.innerHTML  = '';
+    if (bnav) bnav.innerHTML = '';
     return;
   }
 
@@ -205,7 +207,7 @@ function renderTopbar() {
     <div class="nav-tabs">
       <button class="nav-tab ${state.view==='bets'?'active':''}" onclick="app.setView('bets')">Veikkaukset</button>
       <button class="nav-tab ${state.view==='leaderboard'?'active':''}" onclick="app.setView('leaderboard')">Pisteet</button>
-      <button class="nav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">Muiden veikkaukset</button>
+      <button class="nav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">Muiden</button>
     </div>`;
 
   usr.innerHTML = `
@@ -213,6 +215,22 @@ function renderTopbar() {
       ${state.profile?.display_name || 'Käyttäjä'}
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     </button>`;
+
+  if (bnav) {
+    bnav.innerHTML = `
+      <button class="bnav-tab ${state.view==='bets'?'active':''}" onclick="app.setView('bets')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="0.5" fill="currentColor"/><circle cx="3" cy="12" r="0.5" fill="currentColor"/><circle cx="3" cy="18" r="0.5" fill="currentColor"/></svg>
+        <span>Veikkaukset</span>
+      </button>
+      <button class="bnav-tab ${state.view==='leaderboard'?'active':''}" onclick="app.setView('leaderboard')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+        <span>Pisteet</span>
+      </button>
+      <button class="bnav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Muiden</span>
+      </button>`;
+  }
 }
 
 async function renderAuth(root) {
@@ -275,6 +293,7 @@ function renderBets(el) {
   if (state.filter === 'open')   filtered = matchList.filter(m => !isLocked(m));
   if (state.filter === 'locked') filtered = matchList.filter(m =>  isLocked(m));
   if (state.filter === 'bet')    filtered = matchList.filter(m =>  state.bets[m.id]);
+  if (state.filter === 'unbet')  filtered = matchList.filter(m => !isLocked(m) && !state.bets[m.id]);
 
   // Ryhmitä lohkoittain
   const groups = {};
@@ -303,6 +322,7 @@ function renderBets(el) {
     <div class="filter-bar">
       <button class="filter-btn ${state.filter==='all'?'active':''}"    onclick="app.setFilter('all')">Kaikki</button>
       <button class="filter-btn ${state.filter==='open'?'active':''}"   onclick="app.setFilter('open')">Avoimet</button>
+      <button class="filter-btn ${state.filter==='unbet'?'active':''}"  onclick="app.setFilter('unbet')">Veikkaamatta</button>
       <button class="filter-btn ${state.filter==='locked'?'active':''}" onclick="app.setFilter('locked')">Suljetut</button>
       <button class="filter-btn ${state.filter==='bet'?'active':''}"    onclick="app.setFilter('bet')">Veikatut</button>
       <span class="filter-count">${filtered.length} ottelua</span>
