@@ -306,10 +306,16 @@ function renderView() {
 // ─── Seuraava ottelu -kortti ──────────────────────────────────────────────────
 let _countdownTimer = null;
 
+const GROUP_LABELS = {
+  R32: 'Viimeinen 32', R16: 'Viimeinen 16',
+  QF:  'Puolivälierät', SF: 'Välierät',
+  '3P': 'Pronssiottelu', F: 'Finaali',
+};
+
 function getNextMatch() {
   const list = state.matches.length ? state.matches : MATCHES;
   return list
-    .filter(m => !m.result && new Date(m.kickoff || m.dt) > Date.now() - 2 * 36e5)
+    .filter(m => !m.result && !m.tbd && new Date(m.kickoff || m.dt) > Date.now() - 2 * 36e5)
     .sort((a, b) => new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt))[0] || null;
 }
 
@@ -393,17 +399,18 @@ function tickCountdowns() {
 // ─── Veikkausnäkymä ───────────────────────────────────────────────────────────
 function renderBets(el) {
   const matchList = state.matches.length ? state.matches : MATCHES;
-  const total  = matchList.length;
-  const betCnt = Object.keys(state.bets).length;
-  const openCnt   = matchList.filter(m => !isLocked(m)).length;
-  const lockedCnt = matchList.filter(m =>  isLocked(m)).length;
+  const playable = matchList.filter(m => !m.tbd);
+  const total  = playable.length;
+  const betCnt = playable.filter(m => state.bets[m.id]).length;
+  const openCnt   = playable.filter(m => !isLocked(m)).length;
+  const lockedCnt = playable.filter(m =>  isLocked(m)).length;
   const pts = getTotalPoints();
 
   let filtered = matchList;
-  if (state.filter === 'open')   filtered = matchList.filter(m => !isLocked(m));
-  if (state.filter === 'locked') filtered = matchList.filter(m =>  isLocked(m));
+  if (state.filter === 'open')   filtered = matchList.filter(m => !isLocked(m) && !m.tbd);
+  if (state.filter === 'locked') filtered = matchList.filter(m =>  isLocked(m) && !m.tbd);
   if (state.filter === 'bet')    filtered = matchList.filter(m =>  state.bets[m.id]);
-  if (state.filter === 'unbet')  filtered = matchList.filter(m => !isLocked(m) && !state.bets[m.id]);
+  if (state.filter === 'unbet')  filtered = matchList.filter(m => !isLocked(m) && !state.bets[m.id] && !m.tbd);
 
   // Ryhmitä lohkoittain
   const groups = {};
@@ -417,7 +424,9 @@ function renderBets(el) {
     .sort(([a],[b]) => a.localeCompare(b))
     .map(([g, ms]) => {
       const rows = ms.map(m => renderMatchCard(m)).join('');
-      return `<div class="group-block"><div class="group-label">Lohko ${g}</div>${rows}</div>`;
+      const label = GROUP_LABELS[g] ? GROUP_LABELS[g] : `Lohko ${g}`;
+      const isTbdSection = !!GROUP_LABELS[g];
+      return `<div class="group-block"><div class="group-label ${isTbdSection?'knockout-label':''}">${label}</div>${rows}</div>`;
     }).join('');
 
   el.innerHTML = `
@@ -470,6 +479,20 @@ function handleGoalInput(inp) {
 
 function renderMatchCard(m) {
   const matchId = m.id;
+
+  // TBD-ottelu — ei vielä veikattavissa
+  if (m.tbd) {
+    return `
+      <div class="match-card locked tbd-match" id="card-${matchId}">
+        <div class="match-teams">
+          <span class="match-home tbd-name">?</span>
+          <span class="match-away tbd-name">?</span>
+          <div class="match-meta">${fmtDate(m.dt || m.kickoff)}</div>
+        </div>
+        <span class="tbd-badge">Avautuu kun otteluparit selviävät</span>
+      </div>`;
+  }
+
   const locked  = isLocked(m);
   const bet     = state.bets[matchId];
   const mData   = getMatchData(matchId);
@@ -545,11 +568,19 @@ function updateMatchCardPoints(matchId) {
 
 // ─── Uutiset ──────────────────────────────────────────────────────────────────
 const NEWS_FEEDS = [
-  { name: 'Google Uutiset',  url: 'https://news.google.com/rss/search?q=MM+2026+jalkapallo+FIFA&hl=fi&gl=FI&ceid=FI:fi' },
-  { name: 'YLE Urheilu',     url: 'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU' },
+  { name: 'MM 2026',    url: 'https://news.google.com/rss/search?q=FIFA+World+Cup+2026+jalkapallo&hl=fi&gl=FI&ceid=FI:fi' },
+  { name: 'YLE Urheilu', url: 'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU' },
 ];
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
-const NEWS_CACHE_MS = 10 * 60 * 1000; // 10 min
+const NEWS_CACHE_MS = 10 * 60 * 1000;
+
+const FOOTBALL_WORDS = ['jalkapallo','mm-kisa','mm 2026','world cup','fifa','maajoukkue',
+                        'veikkaus','lohko','finaali','välierä','puolivälierä'];
+
+function isFootballNews(title) {
+  const t = (title || '').toLowerCase();
+  return FOOTBALL_WORDS.some(w => t.includes(w));
+}
 
 async function loadNews() {
   if (state.news && Date.now() - state.news.fetchedAt < NEWS_CACHE_MS) {
@@ -563,9 +594,10 @@ async function loadNews() {
       (data.items || []).forEach(item => all.push({ ...item, sourceName: feed.name }));
     } catch { /* feed epäkäytettävissä, ohitetaan */ }
   }));
-  all.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  state.news = { items: all, fetchedAt: Date.now() };
-  return all;
+  const filtered = all.filter(item => isFootballNews(item.title));
+  filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  state.news = { items: filtered, fetchedAt: Date.now() };
+  return filtered;
 }
 
 function timeAgo(dateStr) {

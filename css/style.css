@@ -317,6 +317,33 @@ body {
   padding-left: 2px;
 }
 
+.knockout-label {
+  color: var(--indigo);
+  border-left: 2px solid var(--indigo);
+  padding-left: 8px;
+}
+
+/* ── TBD-ottelu ─────────────────────────────────────────────────────────────── */
+.tbd-match {
+  opacity: 0.5;
+  border-style: dashed !important;
+}
+
+.tbd-name {
+  color: var(--text3) !important;
+  font-style: italic;
+}
+
+.tbd-badge {
+  font-size: 10px;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
 /* ── Ottelukortti ───────────────────────────────────────────────────────────── */
 .match-card {
   background: var(--surface);

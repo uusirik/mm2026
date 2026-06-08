@@ -73,6 +73,51 @@ export const MATCHES = [
   {id:'K6',g:'K',h:'Kongon DT',a:'Uzbekistan',dt:'2026-06-27T23:30:00Z'},
   {id:'J5',g:'J',h:'Algeria',a:'Itävalta',dt:'2026-06-28T02:00:00Z'},
   {id:'J6',g:'J',h:'Jordania',a:'Argentiina',dt:'2026-06-28T02:00:00Z'},
+
+  // ── Jatkosarja — avautuu veikattavaksi kun otteluparit selviävät ──────────
+  // Viimeinen 32
+  {id:'R32_01',g:'R32',h:'TBD',a:'TBD',dt:'2026-06-29T18:00:00Z',tbd:true},
+  {id:'R32_02',g:'R32',h:'TBD',a:'TBD',dt:'2026-06-29T21:00:00Z',tbd:true},
+  {id:'R32_03',g:'R32',h:'TBD',a:'TBD',dt:'2026-06-30T01:00:00Z',tbd:true},
+  {id:'R32_04',g:'R32',h:'TBD',a:'TBD',dt:'2026-06-30T18:00:00Z',tbd:true},
+  {id:'R32_05',g:'R32',h:'TBD',a:'TBD',dt:'2026-06-30T21:00:00Z',tbd:true},
+  {id:'R32_06',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-01T01:00:00Z',tbd:true},
+  {id:'R32_07',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-01T18:00:00Z',tbd:true},
+  {id:'R32_08',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-01T21:00:00Z',tbd:true},
+  {id:'R32_09',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-02T01:00:00Z',tbd:true},
+  {id:'R32_10',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-02T18:00:00Z',tbd:true},
+  {id:'R32_11',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-02T21:00:00Z',tbd:true},
+  {id:'R32_12',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-03T01:00:00Z',tbd:true},
+  {id:'R32_13',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-03T18:00:00Z',tbd:true},
+  {id:'R32_14',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-03T21:00:00Z',tbd:true},
+  {id:'R32_15',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-04T01:00:00Z',tbd:true},
+  {id:'R32_16',g:'R32',h:'TBD',a:'TBD',dt:'2026-07-04T18:00:00Z',tbd:true},
+
+  // Viimeinen 16
+  {id:'R16_1',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-06T18:00:00Z',tbd:true},
+  {id:'R16_2',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-06T21:00:00Z',tbd:true},
+  {id:'R16_3',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-07T18:00:00Z',tbd:true},
+  {id:'R16_4',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-07T21:00:00Z',tbd:true},
+  {id:'R16_5',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-08T18:00:00Z',tbd:true},
+  {id:'R16_6',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-08T21:00:00Z',tbd:true},
+  {id:'R16_7',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-09T18:00:00Z',tbd:true},
+  {id:'R16_8',g:'R16',h:'TBD',a:'TBD',dt:'2026-07-09T21:00:00Z',tbd:true},
+
+  // Puolivälierät
+  {id:'QF_1',g:'QF',h:'TBD',a:'TBD',dt:'2026-07-11T18:00:00Z',tbd:true},
+  {id:'QF_2',g:'QF',h:'TBD',a:'TBD',dt:'2026-07-11T21:00:00Z',tbd:true},
+  {id:'QF_3',g:'QF',h:'TBD',a:'TBD',dt:'2026-07-12T18:00:00Z',tbd:true},
+  {id:'QF_4',g:'QF',h:'TBD',a:'TBD',dt:'2026-07-12T21:00:00Z',tbd:true},
+
+  // Välierät
+  {id:'SF_1',g:'SF',h:'TBD',a:'TBD',dt:'2026-07-15T19:00:00Z',tbd:true},
+  {id:'SF_2',g:'SF',h:'TBD',a:'TBD',dt:'2026-07-16T19:00:00Z',tbd:true},
+
+  // Pronssiottelu
+  {id:'3P',g:'3P',h:'TBD',a:'TBD',dt:'2026-07-18T19:00:00Z',tbd:true},
+
+  // Finaali
+  {id:'FIN',g:'F',h:'TBD',a:'TBD',dt:'2026-07-19T19:00:00Z',tbd:true},
 ];
 
 /**
@@ -145,7 +190,9 @@ export function calcPoints(bet, match) {
 }
 
 export function isLocked(match) {
-  return Date.now() >= new Date(match.dt).getTime();
+  if (match.tbd) return true;
+  const dt = match.kickoff || match.dt;
+  return Date.now() >= new Date(dt).getTime();
 }
 
 export function fmtDate(dtStr) {
