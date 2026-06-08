@@ -100,11 +100,12 @@ function mlToDecimal(ml) {
   return Math.round(dec * 100) / 100;
 }
 
-// Palauttaa tänään ja eilen YYYYMMDD-muodossa (UTC)
-function getRecentDates() {
+// Palauttaa eilen + tänään + seuraavat 5 päivää YYYYMMDD-muodossa (UTC)
+// Eilinen = tulokset, tulevat = kertoimet etukäteen
+function getRelevantDates() {
   const now = new Date();
-  return [0, 1].map(i => {
-    const d = new Date(now.getTime() - i * 864e5);
+  return [-1, 0, 1, 2, 3, 4, 5].map(i => {
+    const d = new Date(now.getTime() + i * 864e5);
     return d.toISOString().slice(0, 10).replace(/-/g, '');
   });
 }
@@ -143,7 +144,7 @@ async function main() {
   const sbMatches = await fetchSupabaseMatches();
   const sbIndex = new Map(sbMatches.map(m => [`${m.home}|${m.away}`, m]));
 
-  const dates = getRecentDates();
+  const dates = getRelevantDates();
   const events = (await Promise.all(dates.map(fetchEspn))).flat();
   console.log(`ESPN: ${events.length} ottelua (${dates.join(', ')})`);
 

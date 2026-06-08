@@ -230,7 +230,7 @@ function renderTopbar() {
     <div class="nav-tabs">
       <button class="nav-tab ${state.view==='bets'?'active':''}" onclick="app.setView('bets')">Veikkaukset</button>
       <button class="nav-tab ${state.view==='leaderboard'?'active':''}" onclick="app.setView('leaderboard')">Pisteet</button>
-      <button class="nav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">Muiden</button>
+      <button class="nav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">Vertailu</button>
       <button class="nav-tab ${state.view==='news'?'active':''}" onclick="app.setView('news')">Uutiset</button>
     </div>`;
 
@@ -252,7 +252,7 @@ function renderTopbar() {
       </button>
       <button class="bnav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Muiden</span>
+        <span>Vertailu</span>
       </button>
       <button class="bnav-tab ${state.view==='news'?'active':''}" onclick="app.setView('news')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8z"/></svg>
@@ -458,6 +458,23 @@ function renderBets(el) {
       <button class="filter-btn ${state.filter==='locked'?'active':''}" onclick="app.setFilter('locked')">Suljetut</button>
       <button class="filter-btn ${state.filter==='bet'?'active':''}"    onclick="app.setFilter('bet')">Veikatut</button>
       <span class="filter-count">${filtered.length} ottelua</span>
+      <button class="info-btn" onclick="app.toggleInfo()" title="Pisteytyssäännöt">?</button>
+    </div>
+    <div class="info-panel" id="info-panel" style="display:none">
+      <div class="info-panel-title">Pisteytys</div>
+      <table class="info-table">
+        <tr><td>Tulos täysin oikein (1/X/2 + molemmat maalit)</td><td>4 p</td></tr>
+        <tr><td>Voittaja + toisen joukkueen maalit oikein</td><td>3 p</td></tr>
+        <tr><td>Vain voittaja oikein</td><td>2 p</td></tr>
+        <tr><td>Vain toisen joukkueen maalit oikein</td><td>1 p</td></tr>
+        <tr><td>Ei osumia</td><td>0 p</td></tr>
+      </table>
+      <div class="info-panel-sub">Jatkosarjassa:</div>
+      <table class="info-table">
+        <tr><td>Loppusijoitus täysin oikein</td><td>3 p</td></tr>
+        <tr><td>Veikkasi X, jatkoaika/pk:t ratkaisi</td><td>2 p</td></tr>
+        <tr><td>Joukkue oikeassa mitaliottelussa, väärä sijoitus</td><td>1 p</td></tr>
+      </table>
     </div>
     ${groupsHtml || '<div class="loading">Ei otteluita.</div>'}`;
 
@@ -705,7 +722,7 @@ async function renderOthers(el) {
 
   const groupsHtml = (() => {
     const groups = {};
-    matchList.filter(m => isLocked(m)).forEach(m => {
+    matchList.filter(m => isLocked(m) && !m.tbd).forEach(m => {
       const g = m.group_name || m.g;
       if (!groups[g]) groups[g] = [];
       groups[g].push(m);
@@ -713,31 +730,33 @@ async function renderOthers(el) {
     if (!Object.keys(groups).length)
       return '<div class="loading">Ei vielä lukittuja otteluita.</div>';
 
-    return Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([g,ms]) => {
-      const rows = ms.map(m => {
-        const chips = Object.values(byUser).map(u => {
-          const b = u.bets[m.id];
-          if (!b) return '';
-          const cls = { '1': 'r1', 'x': 'rx', '2': 'r2' }[b.prediction];
-          return `<div class="other-chip">
-            <span class="other-chip-name">${u.name}</span>
-            <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>
-          </div>`;
+    return Object.entries(groups)
+      .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
+      .map(([g,ms]) => {
+        const rows = ms.map(m => {
+          const chips = Object.values(byUser).map(u => {
+            const b = u.bets[m.id];
+            if (!b) return '';
+            const cls = { '1': 'r1', 'x': 'rx', '2': 'r2' }[b.prediction];
+            return `<div class="other-chip">
+              <span class="other-chip-name">${u.name}</span>
+              <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>
+            </div>`;
+          }).filter(Boolean).join('');
+          if (!chips) return '';
+          return `
+            <div class="others-match">
+              <div class="others-match-title">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a} <span class="others-date">${fmtDate(m.dt||m.kickoff)}</span></div>
+              <div class="others-grid">${chips}</div>
+            </div>`;
         }).filter(Boolean).join('');
-        if (!chips) return '';
-        return `
-          <div class="group-block" style="margin-bottom:1rem">
-            <div class="group-label" style="margin-bottom:4px">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a} <span style="font-weight:400;color:var(--c-text3)">${fmtDate(m.dt||m.kickoff)}</span></div>
-            <div class="others-grid">${chips}</div>
-          </div>`;
-      }).filter(Boolean).join('');
-      if (!rows) return '';
-      const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
-      return `<div style="margin-bottom:1.5rem"><div class="group-label" style="font-size:13px;margin-bottom:8px">${label}</div>${rows}</div>`;
-    }).join('');
+        if (!rows) return '';
+        const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
+        return `<div class="others-group"><div class="group-label ${GROUP_LABELS[g]?'knockout-label':''}">${label}</div>${rows}</div>`;
+      }).join('');
   })();
 
-  el.innerHTML = `<div style="padding-top:0.5rem">${groupsHtml}</div>`;
+  el.innerHTML = `<div class="others-view">${groupsHtml}</div>`;
 }
 
 // ─── Toiminnot (globaalit, kutsutaan HTML:stä) ────────────────────────────────
@@ -786,6 +805,11 @@ window.app = {
     renderView();
   },
 
+  toggleInfo() {
+    const p = document.getElementById('info-panel');
+    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  },
+
   setView(v) {
     state.view = v;
     renderTopbar();
@@ -821,33 +845,31 @@ function toast(msg, isError = false) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
-  // Näytä auth-sivu heti — state.user on null kunnes Supabase vastaa
+  // Tarkista sessio ensin — estää login-sivun välähtämisen F5:llä
+  const { data: { session: existing } } = await sb.auth.getSession();
+  if (existing) {
+    state.user = existing.user;
+    const { data: profile } = await sb.from('profiles').select('*').eq('id', state.user.id).single();
+    state.profile = profile;
+    await Promise.all([loadMatches(), loadBets()]);
+  }
   renderAll();
 
-  // Auth-tilan muutos (kirjautuminen, uloskirjautuminen)
+  // Kuuntele myöhempiä auth-muutoksia (kirjautuminen, uloskirjautuminen)
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'INITIAL_SESSION') return; // Hoidettu yllä
     state.user = session?.user || null;
 
     if (state.user) {
-      // Hae profiili
-      const { data: profile } = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', state.user.id)
-        .single();
+      const { data: profile } = await sb.from('profiles').select('*').eq('id', state.user.id).single();
       state.profile = profile;
-
       await Promise.all([loadMatches(), loadBets()]);
+    } else {
+      state.profile = null;
+      state.bets = {};
     }
-
     renderAll();
   });
-
-  // Alussa tarkista session
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    renderAll();
-  }
 
   // Päivitä lock-tilanne 60s välein
   setInterval(() => {
