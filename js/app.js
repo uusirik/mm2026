@@ -11,14 +11,15 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ─── Sovelluksen tila ─────────────────────────────────────────────────────────
 let state = {
-  view: 'bets',       // 'bets' | 'leaderboard' | 'others'
-  filter: 'all',      // 'all' | 'open' | 'locked' | 'bet'
+  view: 'bets',       // 'bets' | 'leaderboard' | 'others' | 'news'
+  filter: 'all',      // 'all' | 'open' | 'locked' | 'bet' | 'unbet'
   user: null,
   profile: null,
   bets: {},           // { match_id: { prediction, home_goals, away_goals } }
   matches: [],        // Supabasesta haettu (sisältää result-kentän)
   leaderboard: [],
-  saveQueue: {},      // Debounce-jonossa olevat tallennukset
+  news: null,         // { items: [], fetchedAt: 0 }
+  saveQueue: {},
   saveTimers: {},
 };
 
@@ -208,6 +209,7 @@ function renderTopbar() {
       <button class="nav-tab ${state.view==='bets'?'active':''}" onclick="app.setView('bets')">Veikkaukset</button>
       <button class="nav-tab ${state.view==='leaderboard'?'active':''}" onclick="app.setView('leaderboard')">Pisteet</button>
       <button class="nav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">Muiden</button>
+      <button class="nav-tab ${state.view==='news'?'active':''}" onclick="app.setView('news')">Uutiset</button>
     </div>`;
 
   usr.innerHTML = `
@@ -229,6 +231,10 @@ function renderTopbar() {
       <button class="bnav-tab ${state.view==='others'?'active':''}" onclick="app.setView('others')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Muiden</span>
+      </button>
+      <button class="bnav-tab ${state.view==='news'?'active':''}" onclick="app.setView('news')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8z"/></svg>
+        <span>Uutiset</span>
       </button>`;
   }
 }
@@ -275,9 +281,10 @@ function renderMainShell(root) {
 function renderView() {
   const el = document.getElementById('main-view');
   if (!el) return;
-  if (state.view === 'bets')        renderBets(el);
+  if (state.view === 'bets')             renderBets(el);
   else if (state.view === 'leaderboard') renderLeaderboard(el);
-  else if (state.view === 'others') renderOthers(el);
+  else if (state.view === 'others')      renderOthers(el);
+  else if (state.view === 'news')        renderNews(el);
 }
 
 // ─── Veikkausnäkymä ───────────────────────────────────────────────────────────
@@ -367,6 +374,16 @@ function renderMatchCard(m) {
   if (res) metaParts.push(`Tulos: ${res.score}`);
   const metaHtml = `<div class="match-meta">${metaParts.join(' · ')}</div>`;
 
+  const oddsHtml = (!locked && mData?.odds_home && mData?.odds_draw && mData?.odds_away)
+    ? `<div class="match-odds">
+        <span class="odds-label">1</span><span class="odds-val">${mData.odds_home}</span>
+        <span class="odds-sep">·</span>
+        <span class="odds-label">X</span><span class="odds-val">${mData.odds_draw}</span>
+        <span class="odds-sep">·</span>
+        <span class="odds-label">2</span><span class="odds-val">${mData.odds_away}</span>
+       </div>`
+    : '';
+
   let actionHtml = '';
   if (locked) {
     if (bet) {
@@ -404,6 +421,7 @@ function renderMatchCard(m) {
         <span class="match-home">${m.home || m.h}</span>
         <span class="match-away">${m.away || m.a}</span>
         ${metaHtml}
+        ${oddsHtml}
       </div>
       ${actionHtml}
     </div>`;
@@ -417,6 +435,58 @@ function updateMatchCardPoints(matchId) {
   if (!bet || !mData?.result) return;
   const { points } = calcPoints(bet, mData);
   el.textContent = `${points}p`;
+}
+
+// ─── Uutiset ──────────────────────────────────────────────────────────────────
+const NEWS_FEEDS = [
+  { name: 'Google Uutiset',  url: 'https://news.google.com/rss/search?q=MM+2026+jalkapallo+FIFA&hl=fi&gl=FI&ceid=FI:fi' },
+  { name: 'YLE Urheilu',     url: 'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU' },
+];
+const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+const NEWS_CACHE_MS = 10 * 60 * 1000; // 10 min
+
+async function loadNews() {
+  if (state.news && Date.now() - state.news.fetchedAt < NEWS_CACHE_MS) {
+    return state.news.items;
+  }
+  const all = [];
+  await Promise.allSettled(NEWS_FEEDS.map(async feed => {
+    try {
+      const res  = await fetch(`${RSS2JSON}${encodeURIComponent(feed.url)}`);
+      const data = await res.json();
+      (data.items || []).forEach(item => all.push({ ...item, sourceName: feed.name }));
+    } catch { /* feed epäkäytettävissä, ohitetaan */ }
+  }));
+  all.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  state.news = { items: all, fetchedAt: Date.now() };
+  return all;
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr);
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'juuri nyt';
+  if (m < 60) return `${m} min sitten`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} t sitten`;
+  return `${Math.floor(h / 24)} pv sitten`;
+}
+
+async function renderNews(el) {
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Ladataan uutisia…</div>';
+  const items = await loadNews();
+  if (!items.length) {
+    el.innerHTML = '<div class="loading">Ei uutisia saatavilla.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="news-list">
+      ${items.slice(0, 30).map(item => `
+        <a class="news-card" href="${item.link}" target="_blank" rel="noopener">
+          <div class="news-title">${item.title}</div>
+          <div class="news-meta">${item.sourceName} · ${timeAgo(item.pubDate)}</div>
+        </a>`).join('')}
+    </div>`;
 }
 
 // ─── Pistetaulukko ────────────────────────────────────────────────────────────
@@ -608,10 +678,17 @@ async function init() {
     renderAll();
   }
 
-  // Päivitä ottelutilanne 60s välein (lock-logiikka)
+  // Päivitä lock-tilanne 60s välein
   setInterval(() => {
     if (state.user && state.view === 'bets') renderView();
   }, 60_000);
+
+  // Hae tuoreet ottelutulokset Supabasesta 5 min välein
+  setInterval(async () => {
+    if (!state.user) return;
+    await loadMatches();
+    if (state.view === 'bets') renderView();
+  }, 5 * 60_000);
 }
 
 init();

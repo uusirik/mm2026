@@ -533,6 +533,64 @@ body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Kertoimet ──────────────────────────────────────────────────────────────── */
+.match-odds {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.odds-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+}
+
+.odds-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  background: var(--amber-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.odds-sep { font-size: 10px; color: var(--text3); }
+
+/* ── Uutiset ────────────────────────────────────────────────────────────────── */
+.news-list { display: flex; flex-direction: column; gap: 6px; }
+
+.news-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.news-card:hover {
+  border-color: var(--border2);
+  background: var(--surface2);
+}
+
+.news-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 5px;
+}
+
+.news-meta {
+  font-size: 11px;
+  color: var(--text3);
+}
+
 /* ── Mobiilialanavigaatio ────────────────────────────────────────────────────── */
 .bottom-nav {
   display: none;

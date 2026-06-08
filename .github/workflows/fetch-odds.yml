@@ -1,9 +1,9 @@
-name: Fetch Match Results
+name: Fetch Betting Odds
 
 on:
   schedule:
-    - cron: '*/5 * * * *'    # joka 5. minuutti
-  workflow_dispatch:           # voi ajaa käsin
+    - cron: '0 */4 * * *'   # joka 4. tunti
+  workflow_dispatch:
 
 jobs:
   fetch:
@@ -15,8 +15,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Hae ja päivitä tulokset
+      - name: Hae ja päivitä kertoimet
         env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/fetch-results.js
+        run: node scripts/fetch-odds.js
