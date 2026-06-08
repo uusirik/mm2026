@@ -1,30 +1,33 @@
--- MM 2026 Veikkaus — Supabase schema
--- Aja tämä Supabase SQL Editorissa
+-- MM 2026 Veikkaus — täydellinen Supabase-schema
+-- Aja Supabase SQL Editorissa (Database → SQL Editor → New query)
+-- Voidaan ajaa uudelleen — IF NOT EXISTS / OR REPLACE estää duplikaatit
 
--- Profiilit (täydentää auth.users-taulukon)
-create table public.profiles (
+-- ─── Taulut ───────────────────────────────────────────────────────────────────
+
+create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   display_name text not null,
   created_at timestamptz default now()
 );
 
--- Ottelut
-create table public.matches (
-  id text primary key,          -- esim. 'A1', 'B3'
-  group_name text not null,     -- 'A' .. 'L'
+create table if not exists public.matches (
+  id text primary key,
+  group_name text not null,
   home text not null,
   away text not null,
   kickoff timestamptz not null,
-  -- Täytetään kun ottelu on pelattu (admin)
   result text check (result in ('1','x','2')),
   home_goals integer,
   away_goals integer,
-  -- Onko jatkoajalla/rangaistuksilla ratkaistu (bonus piste)
-  extra_time boolean default false
+  extra_time boolean default false,
+  -- Kertoimet (haetaan automaattisesti ESPN API:sta)
+  odds_home numeric,
+  odds_draw numeric,
+  odds_away numeric,
+  odds_updated_at timestamptz
 );
 
--- Veikkaukset
-create table public.bets (
+create table if not exists public.bets (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles on delete cascade not null,
   match_id text references public.matches on delete cascade not null,
@@ -36,21 +39,25 @@ create table public.bets (
   unique (user_id, match_id)
 );
 
--- Pistetaulukko (laskettu näkymä)
-create view public.leaderboard as
+-- ─── Lisää odds-sarakkeet jos taulut on jo olemassa ───────────────────────────
+alter table public.matches add column if not exists odds_home numeric;
+alter table public.matches add column if not exists odds_draw numeric;
+alter table public.matches add column if not exists odds_away numeric;
+alter table public.matches add column if not exists odds_updated_at timestamptz;
+
+-- ─── Pistetaulukko ────────────────────────────────────────────────────────────
+create or replace view public.leaderboard as
 select
   p.id as user_id,
   p.display_name,
   count(b.id) filter (where b.id is not null) as bets_placed,
   coalesce(sum(
     case
-      -- 4p: tulos täysin oikein (1/X/2 + molemmat maalit)
       when b.prediction = m.result
         and b.home_goals = m.home_goals
         and b.away_goals = m.away_goals
         and m.extra_time = false
       then 4
-      -- 3p: voittaja + toisen joukkueen maalimäärä oikein
       when b.prediction = m.result
         and (
           (b.prediction = '1' and b.away_goals = m.away_goals) or
@@ -60,29 +67,24 @@ select
         and not (b.home_goals = m.home_goals and b.away_goals = m.away_goals)
         and m.extra_time = false
       then 3
-      -- 2p: vain voittaja oikein
       when b.prediction = m.result
         and not (b.home_goals = m.home_goals and b.away_goals = m.away_goals)
         and m.extra_time = false
       then 2
-      -- 1p: vain toisen joukkueen maalimäärä oikein (väärä voittaja)
       when b.prediction != m.result
         and (b.home_goals = m.home_goals or b.away_goals = m.away_goals)
         and m.extra_time = false
       then 1
-      -- 3p: loppusijoitus täysin oikein (extra time, oikea tulos)
       when b.prediction = m.result
         and b.home_goals = m.home_goals
         and b.away_goals = m.away_goals
         and m.extra_time = true
       then 3
-      -- 2p: loppusijoitus oikein, väärällä sijalla (extra time, väärä tulos mutta taisteli)
       when b.prediction != m.result
         and m.extra_time = true
         and m.result in ('1','2')
         and b.prediction = 'x'
       then 2
-      -- 1p: bonus peli oikein tai loppusijoituksissa joukkue väärässä mitaliottelussa
       when m.extra_time = true
         and b.prediction = m.result
       then 1
@@ -100,40 +102,58 @@ left join public.matches m on m.id = b.match_id and m.result is not null
 group by p.id, p.display_name
 order by total_points desc, exact_results desc;
 
--- RLS (Row Level Security)
+-- ─── RLS ──────────────────────────────────────────────────────────────────────
 alter table public.profiles enable row level security;
-alter table public.matches enable row level security;
-alter table public.bets enable row level security;
+alter table public.matches  enable row level security;
+alter table public.bets     enable row level security;
 
--- Profiilit: käyttäjä näkee kaikki, muokkaa vain omansa
-create policy "Profiilit julkisesti luettavissa" on public.profiles for select using (true);
+-- Profiilit
+drop policy if exists "Profiilit julkisesti luettavissa"  on public.profiles;
+drop policy if exists "Käyttäjä muokkaa omaa profiiliaan" on public.profiles;
+drop policy if exists "Käyttäjä luo oman profiilinsa"     on public.profiles;
+
+create policy "Profiilit julkisesti luettavissa"  on public.profiles for select using (true);
 create policy "Käyttäjä muokkaa omaa profiiliaan" on public.profiles for update using (auth.uid() = id);
-create policy "Käyttäjä luo oman profiilinsa" on public.profiles for insert with check (auth.uid() = id);
+create policy "Käyttäjä luo oman profiilinsa"     on public.profiles for insert with check (auth.uid() = id);
 
--- Ottelut: kaikki lukee, vain service_role kirjoittaa
+-- Ottelut (kaikki lukee, vain service_role kirjoittaa)
+drop policy if exists "Ottelut julkisesti luettavissa" on public.matches;
 create policy "Ottelut julkisesti luettavissa" on public.matches for select using (true);
 
--- Veikkaukset: kaikki näkee kaikki, kirjoittaa vain omansa
+-- Veikkaukset
+drop policy if exists "Veikkaukset julkisesti luettavissa" on public.bets;
+drop policy if exists "Käyttäjä luo veikkauksen"           on public.bets;
+drop policy if exists "Käyttäjä muokkaa omaa veikkaustaan" on public.bets;
+
 create policy "Veikkaukset julkisesti luettavissa" on public.bets for select using (true);
-create policy "Käyttäjä luo veikkauksen" on public.bets for insert with check (auth.uid() = user_id);
+create policy "Käyttäjä luo veikkauksen"           on public.bets for insert with check (auth.uid() = user_id);
 create policy "Käyttäjä muokkaa omaa veikkaustaan" on public.bets for update using (auth.uid() = user_id);
 
--- Automaattinen profiilin luonti kirjautumisen yhteydessä
+-- ─── Trigger: luo profiili automaattisesti rekisteröinnin yhteydessä ─────────
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public
 as $$
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)));
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data->>'display_name',
+      split_part(new.email, '@', 1),
+      'Käyttäjä'
+    )
+  );
   return new;
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- Syötä otteludata
+-- ─── Otteludata ───────────────────────────────────────────────────────────────
+-- Käytä ON CONFLICT DO NOTHING jotta uudelleenajo ei kaada
 insert into public.matches (id, group_name, home, away, kickoff) values
 ('A1','A','Meksiko','Etelä-Afrikka','2026-06-11T19:00:00Z'),
 ('A2','A','Etelä-Korea','Tšekki','2026-06-12T02:00:00Z'),
@@ -206,4 +226,5 @@ insert into public.matches (id, group_name, home, away, kickoff) values
 ('K5','K','Kolumbia','Portugali','2026-06-27T23:30:00Z'),
 ('K6','K','Kongon DT','Uzbekistan','2026-06-27T23:30:00Z'),
 ('J5','J','Algeria','Itävalta','2026-06-28T02:00:00Z'),
-('J6','J','Jordania','Argentiina','2026-06-28T02:00:00Z');
+('J6','J','Jordania','Argentiina','2026-06-28T02:00:00Z')
+on conflict (id) do nothing;
