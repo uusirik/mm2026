@@ -342,7 +342,7 @@ function renderNextMatchCard() {
   const mData   = getMatchData(m.id);
   const bet     = state.bets[m.id];
 
-  const hasOdds = mData?.odds_home && mData?.odds_away;
+  const hasOdds = mData?.odds_home || mData?.odds_draw || mData?.odds_away;
   const oddsHtml = hasOdds ? `
     <div class="nm-odds">
       <div class="nm-odds-item"><span class="nm-odds-lbl">1</span><span class="nm-odds-val">${mData.odds_home}</span></div>
@@ -535,13 +535,13 @@ function renderMatchCard(m) {
   if (res) metaParts.push(`Tulos: ${res.score}`);
   const metaHtml = `<div class="match-meta">${metaParts.join(' · ')}</div>`;
 
-  const oddsHtml = (!locked && mData?.odds_home && mData?.odds_away)
+  const oddsHtml = (!locked && (mData?.odds_home || mData?.odds_draw || mData?.odds_away))
     ? `<div class="match-odds">
-        <span class="odds-label">1</span><span class="odds-val">${mData.odds_home}</span>
+        <span class="odds-label">1</span><span class="odds-val">${mData.odds_home ?? '–'}</span>
         <span class="odds-sep">·</span>
         <span class="odds-label">X</span><span class="odds-val">${mData.odds_draw ?? '–'}</span>
         <span class="odds-sep">·</span>
-        <span class="odds-label">2</span><span class="odds-val">${mData.odds_away}</span>
+        <span class="odds-label">2</span><span class="odds-val">${mData.odds_away ?? '–'}</span>
        </div>`
     : '';
 
