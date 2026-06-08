@@ -1,16 +1,13 @@
 // fetch-results.js
-// Hakee MM 2026 otteluiden tulokset api-football.com:sta ja päivittää Supabaseen.
-// Ajetaan GitHub Actionsin kautta 30 min välein.
+// Hakee MM 2026 tulokset ja kertoimet ESPN:n ilmaisesta API:sta (ei avainta).
+// Ajetaan GitHub Actionsista 3x per workflow-suoritus ~2 min välein.
 
 const SUPABASE_URL = 'https://hwomgxbxcyrrjcwgjgtj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
-// FIFA World Cup 2026 — api-football.com league id
-const LEAGUE_ID = 1;
-const SEASON    = 2026;
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 
-// Suomenkielinen nimi → englanninkielinen (api-football.com)
+// Suomenkielinen nimi → englanninkielinen (ESPN-muoto)
 const TEAM_MAP = {
   'Meksiko':              'Mexico',
   'Etelä-Afrikka':        'South Africa',
@@ -18,7 +15,6 @@ const TEAM_MAP = {
   'Tšekki':               'Czech Republic',
   'Kanada':               'Canada',
   'Bosnia & Hertsegovina':'Bosnia',
-  'Bosn. & Hertseg.':     'Bosnia',
   'Qatar':                'Qatar',
   'Sveitsi':              'Switzerland',
   'Brasilia':             'Brazil',
@@ -31,7 +27,7 @@ const TEAM_MAP = {
   'Curaçao':              'Curacao',
   'Alankomaat':           'Netherlands',
   'Japani':               'Japan',
-  'Norsunluurannikko':    "Ivory Coast",
+  'Norsunluurannikko':    'Ivory Coast',
   'Ecuador':              'Ecuador',
   'Ruotsi':               'Sweden',
   'Tunisia':              'Tunisia',
@@ -59,137 +55,151 @@ const TEAM_MAP = {
   'Panama':               'Panama',
   'Uzbekistan':           'Uzbekistan',
   'Kolumbia':             'Colombia',
-  'USA':                  'USA',
+  'USA':                  'United States',
+  'Paraguay':             'Paraguay',
 };
 
-// Päättymistatukset api-football.com:ssa
-const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN']);
-// Statukset jotka tarkoittavat jatkoaikaa / rangaistuksia
-const EXTRA_TIME_STATUSES = new Set(['AET', 'PEN']);
+// Lisäsynonyymit ESPN:n nimille
+const ALIASES = {
+  'usa':                          'unitedstates',
+  'unitedstatesofamerica':        'unitedstates',
+  'czechia':                      'czechrepublic',
+  'ivorycoast':                   'ivorycoast',
+  "cotedivoire":                  'ivorycoast',
+  'democraticrepublicofcongo':    'drcongo',
+  'congodr':                      'drcongo',
+  'republicofcongo':              'drcongo',
+  'bosnia':                       'bosnia',
+  'bosniaandherzegovina':         'bosnia',
+};
 
-async function fetchFixtures() {
-  const url = `https://api-football-v1.p.rapidapi.com/v3/fixtures?league=${LEAGUE_ID}&season=${SEASON}`;
-  const res = await fetch(url, {
-    headers: {
-      'x-rapidapi-key':  RAPIDAPI_KEY,
-      'x-rapidapi-host': 'api-football-v1.p.rapidapi.com',
-    },
+function normalize(s) {
+  return (s || '').toLowerCase().replace(/[^a-z]/g, '');
+}
+
+// Rakenna EN (normalisoitu) → FI-hakemisto
+const EN_TO_FI = {};
+for (const [fi, en] of Object.entries(TEAM_MAP)) {
+  EN_TO_FI[normalize(en)] = fi;
+}
+for (const [alias, canonical] of Object.entries(ALIASES)) {
+  if (!EN_TO_FI[alias]) EN_TO_FI[alias] = EN_TO_FI[canonical];
+}
+
+function toFi(espnName) {
+  const key = normalize(espnName);
+  return EN_TO_FI[key] || EN_TO_FI[ALIASES[key]];
+}
+
+// Muunna amerikkalainen kerroin desimaaliksi
+function mlToDecimal(ml) {
+  if (ml == null) return null;
+  const n = Number(ml);
+  if (isNaN(n) || n === 0) return null;
+  const dec = n > 0 ? n / 100 + 1 : 100 / Math.abs(n) + 1;
+  return Math.round(dec * 100) / 100;
+}
+
+// Palauttaa tänään ja eilen YYYYMMDD-muodossa (UTC)
+function getRecentDates() {
+  const now = new Date();
+  return [0, 1].map(i => {
+    const d = new Date(now.getTime() - i * 864e5);
+    return d.toISOString().slice(0, 10).replace(/-/g, '');
   });
-  if (!res.ok) throw new Error(`API-virhe: ${res.status} ${res.statusText}`);
-  const json = await res.json();
-  return json.response || [];
+}
+
+async function fetchEspn(dateStr) {
+  const res = await fetch(`${ESPN_BASE}?dates=${dateStr}`);
+  if (!res.ok) throw new Error(`ESPN-virhe: ${res.status}`);
+  return (await res.json()).events || [];
 }
 
 async function fetchSupabaseMatches() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/matches?select=*`, {
-    headers: {
-      apikey:        SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
   if (!res.ok) throw new Error(`Supabase-lukuvirhe: ${res.status}`);
   return res.json();
 }
 
-async function updateMatch(matchId, patch) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/matches?id=eq.${matchId}`,
-    {
-      method:  'PATCH',
-      headers: {
-        apikey:          SUPABASE_KEY,
-        Authorization:   `Bearer ${SUPABASE_KEY}`,
-        'Content-Type':  'application/json',
-        Prefer:          'return=minimal',
-      },
-      body: JSON.stringify(patch),
-    }
-  );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Supabase-päivitysvirhe (${matchId}): ${res.status} ${txt}`);
-  }
-}
-
-function normalize(name) {
-  return (name || '').toLowerCase().replace(/[^a-z]/g, '');
-}
-
-// Rakenna hakemisto englanninkielinen nimi → joukkueen suomenkielinen key
-const EN_TO_FI = {};
-for (const [fi, en] of Object.entries(TEAM_MAP)) {
-  EN_TO_FI[normalize(en)] = fi;
-}
-
-function matchTeam(apiName) {
-  return EN_TO_FI[normalize(apiName)];
+async function patchMatch(id, patch) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${id}`, {
+    method:  'PATCH',
+    headers: {
+      apikey:         SUPABASE_KEY,
+      Authorization:  `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer:         'return=minimal',
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`Supabase-päivitysvirhe (${id}): ${res.status} ${await res.text()}`);
 }
 
 async function main() {
   if (!SUPABASE_KEY) { console.error('SUPABASE_SERVICE_ROLE_KEY puuttuu'); process.exit(1); }
-  if (!RAPIDAPI_KEY) { console.error('RAPIDAPI_KEY puuttuu'); process.exit(1); }
 
-  console.log('Haetaan otteludata Supabasesta...');
   const sbMatches = await fetchSupabaseMatches();
+  const sbIndex = new Map(sbMatches.map(m => [`${m.home}|${m.away}`, m]));
 
-  // Indeksoi kickoff-ajan (ISO-minuutti) ja kotijoukkueen perusteella
-  const sbIndex = new Map();
-  for (const m of sbMatches) {
-    const homeEn = TEAM_MAP[m.home];
-    const awayEn = TEAM_MAP[m.away];
-    if (homeEn && awayEn) {
-      const key = `${normalize(homeEn)}|${normalize(awayEn)}`;
-      sbIndex.set(key, m);
-    }
-  }
+  const dates = getRecentDates();
+  const events = (await Promise.all(dates.map(fetchEspn))).flat();
+  console.log(`ESPN: ${events.length} ottelua (${dates.join(', ')})`);
 
-  console.log(`Haetaan tulokset api-football.com:sta (league=${LEAGUE_ID}, season=${SEASON})...`);
-  const fixtures = await fetchFixtures();
-  console.log(`Saatiin ${fixtures.length} ottelua API:sta`);
+  let updatedResults = 0;
+  let updatedOdds    = 0;
 
-  let updated = 0;
-  let skipped = 0;
+  for (const event of events) {
+    const comp = event.competitions?.[0];
+    if (!comp) continue;
 
-  for (const f of fixtures) {
-    const status = f.fixture?.status?.short;
-    if (!FINISHED_STATUSES.has(status)) { skipped++; continue; }
+    const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
+    const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
+    if (!homeComp || !awayComp) continue;
 
-    const homeApi = f.teams?.home?.name;
-    const awayApi = f.teams?.away?.name;
-    const homeFi  = matchTeam(homeApi);
-    const awayFi  = matchTeam(awayApi);
-
+    const homeFi = toFi(homeComp.team?.displayName);
+    const awayFi = toFi(awayComp.team?.displayName);
     if (!homeFi || !awayFi) {
-      console.warn(`  Tuntematon joukkue: "${homeApi}" tai "${awayApi}" — ohitetaan`);
+      console.warn(`  Tuntematon joukkue: "${homeComp.team?.displayName}" tai "${awayComp.team?.displayName}"`);
       continue;
     }
 
-    const key = `${normalize(TEAM_MAP[homeFi])}|${normalize(TEAM_MAP[awayFi])}`;
-    const sbM  = sbIndex.get(key);
+    const sbM = sbIndex.get(`${homeFi}|${awayFi}`);
     if (!sbM) { console.warn(`  Ei vastaavuutta: ${homeFi} – ${awayFi}`); continue; }
 
-    // Jos tulos on jo oikein, ei tarvitse päivittää
-    const hg = f.goals?.home ?? 0;
-    const ag = f.goals?.away ?? 0;
-    if (sbM.result !== null && sbM.home_goals === hg && sbM.away_goals === ag) {
-      skipped++;
-      continue;
+    // ── Kertoimet (pre-match, ESPN/DraftKings) ──────────────────────────────
+    const oddsArr = comp.odds;
+    if (oddsArr?.length && !sbM.result) {
+      const o = oddsArr[0];
+      const homeOdds = mlToDecimal(o.homeTeamOdds?.moneyLine);
+      const awayOdds = mlToDecimal(o.awayTeamOdds?.moneyLine);
+      const drawOdds = mlToDecimal(o.drawOdds?.moneyLine);
+      if (homeOdds || drawOdds || awayOdds) {
+        await patchMatch(sbM.id, {
+          odds_home: homeOdds, odds_draw: drawOdds, odds_away: awayOdds,
+          odds_updated_at: new Date().toISOString(),
+        });
+        updatedOdds++;
+      }
     }
 
-    const result = hg > ag ? '1' : ag > hg ? '2' : 'x';
-    const extraTime = EXTRA_TIME_STATUSES.has(status);
+    // ── Tulos (vain kun ottelu on päättynyt) ────────────────────────────────
+    const completed = event.status?.type?.completed;
+    if (!completed) continue;
 
-    console.log(`  Päivitetään ${sbM.id}: ${homeFi} ${hg}–${ag} ${awayFi} (${result}${extraTime ? ', ja' : ''})`);
-    await updateMatch(sbM.id, {
-      result,
-      home_goals:  hg,
-      away_goals:  ag,
-      extra_time:  extraTime,
-    });
-    updated++;
+    const hg = parseInt(homeComp.score) || 0;
+    const ag = parseInt(awayComp.score) || 0;
+
+    if (sbM.result !== null && sbM.home_goals === hg && sbM.away_goals === ag) continue;
+
+    const result = hg > ag ? '1' : ag > hg ? '2' : 'x';
+    console.log(`  ✓ ${homeFi} ${hg}–${ag} ${awayFi} → ${result}`);
+    await patchMatch(sbM.id, { result, home_goals: hg, away_goals: ag });
+    updatedResults++;
   }
 
-  console.log(`\nValmis. Päivitetty: ${updated}, ohitettu: ${skipped}`);
+  console.log(`Valmis. Tuloksia päivitetty: ${updatedResults}, kertoimia: ${updatedOdds}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

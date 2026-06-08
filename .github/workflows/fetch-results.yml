@@ -2,8 +2,8 @@ name: Fetch Match Results
 
 on:
   schedule:
-    - cron: '*/5 * * * *'    # joka 5. minuutti
-  workflow_dispatch:           # voi ajaa käsin
+    - cron: '*/5 * * * *'   # joka 5. minuutti
+  workflow_dispatch:          # voi ajaa käsin
 
 jobs:
   fetch:
@@ -15,8 +15,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Hae ja päivitä tulokset
+      - name: Hae tulokset ja kertoimet (ESPN API)
         env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/fetch-results.js
