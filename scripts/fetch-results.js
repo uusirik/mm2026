@@ -168,8 +168,12 @@ async function fetchVeikkausOdds(cookie) {
   const res = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games/EBET/draws`, {
     headers: { ...VEIKKAUS_HEADERS, Cookie: cookie },
   });
-  if (!res.ok || res.status === 204) { console.warn('Veikkaus: ei pelejä'); return []; }
-  const data = await res.json();
+  console.log(`Veikkaus draws status: ${res.status}`);
+  if (res.status === 204) { console.warn('Veikkaus: 204 ei sisältöä'); return []; }
+  if (!res.ok) { console.warn(`Veikkaus: HTTP-virhe ${res.status}`); return []; }
+  const text = await res.text();
+  console.log('Veikkaus raw (500 merkkiä):', text.slice(0, 500));
+  const data = JSON.parse(text);
   // Pura kaikki 1X2-rivit
   const games = [];
   for (const draw of (data.draws ?? [])) {
