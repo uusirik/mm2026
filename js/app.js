@@ -79,7 +79,30 @@ function debounceSave(matchId) {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-const ACCESS_CODE = 'AFRY2026';
+// SHA-256 tiiviste kutsukoodeista — itse koodi on vain URL-fragmentissa (#...)
+const INVITE_HASHES = new Set([
+  '0556e8c64c72a62f4b6029a8a42cace0fedaf9ed1f1c69794f4d47864642dc29',
+]);
+const INVITE_KEY = 'mm2026_invited';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkInvite() {
+  if (localStorage.getItem(INVITE_KEY)) return true;
+  const fragment = window.location.hash.slice(1);
+  if (!fragment) return false;
+  const hash = await sha256(fragment);
+  if (INVITE_HASHES.has(hash)) {
+    localStorage.setItem(INVITE_KEY, '1');
+    localStorage.setItem('mm2026_invite_fragment', fragment);
+    history.replaceState(null, '', window.location.pathname);
+    return true;
+  }
+  return false;
+}
 
 // Muodostaa Supabase-emailin nimestä — käyttäjä ei koskaan näe tätä
 function nameToEmail(name) {
@@ -89,29 +112,29 @@ function nameToEmail(name) {
   return `${slug}@afry2026.mm`;
 }
 
-// Salasana = yhteinen koodi + PIN
-function makePassword(pin) {
-  return `${ACCESS_CODE}-${pin}`;
+// Salasana = rekisteröintitunnus + PIN
+function makePassword(fragment, pin) {
+  return `${fragment}-${pin}`;
 }
 
 async function signInOrRegister(displayName, pin) {
+  const inviteCode = localStorage.getItem('mm2026_invite_fragment') || '';
   const email    = nameToEmail(displayName);
-  const password = makePassword(pin);
+  const password = makePassword(inviteCode || 'noinvite', pin);
 
-  // Yritetään ensin kirjautua sisään
+  // Yritetään ensin kirjautua sisään (toimii ilman kutsulinkiä paluukerroilla)
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
-  // Jos käyttäjää ei ole, luodaan uusi
+  // Uusi rekisteröinti — vaatii kutsulinkin
   if (signInErr.message.includes('Invalid login credentials')) {
+    if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
     const { data, error: signUpErr } = await sb.auth.signUp({
       email,
       password,
       options: { data: { display_name: displayName } },
     });
     if (signUpErr) return signUpErr;
-
-    // Päivitä nimi profiiliin (trigger saattaa asettaa placeholderin)
     if (data.user) {
       await sb.from('profiles')
         .update({ display_name: displayName })
@@ -191,7 +214,27 @@ function renderTopbar() {
     </button>`;
 }
 
-function renderAuth(root) {
+async function renderAuth(root) {
+  const invited = await checkInvite();
+
+  if (!invited) {
+    root.innerHTML = `
+      <div class="auth-wrap">
+        <div class="auth-logo-area">
+          <span class="auth-logo-icon">⚽</span>
+          <div class="auth-brand">MM 2026</div>
+          <div class="auth-tagline">Veikkaus &nbsp;·&nbsp; AFRY</div>
+        </div>
+        <div class="auth-card">
+          <div class="auth-sub" style="text-align:center;padding:0.5rem 0">
+            Tarvitset kutsulinkkin päästäksesi sivustolle.<br>
+            <span style="color:rgba(255,255,255,0.2);font-size:11px">Ota yhteyttä ryhmän ylläpitäjään.</span>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
   root.innerHTML = `
     <div class="auth-wrap">
       <div class="auth-logo-area">
@@ -200,43 +243,27 @@ function renderAuth(root) {
         <div class="auth-tagline">Veikkaus &nbsp;·&nbsp; Kirjaudu sisään</div>
       </div>
       <div class="auth-card" id="auth-card">
-        <div class="auth-sub">Syötä pääsykoodi päästäksesi sivustolle.</div>
+        <div class="auth-sub">Syötä nimesi ja PIN-koodi.</div>
         <div class="field">
-          <label for="inp-code">Pääsykoodi</label>
-          <input type="password" id="inp-code" placeholder="••••••••" autocomplete="off" />
+          <label for="inp-name">Nimi</label>
+          <input type="text" id="inp-name" placeholder="Etunimi Sukunimi" autocomplete="name" />
         </div>
-        <button class="btn btn-primary btn-full" id="auth-submit" onclick="app.submitCode()">
-          Jatka →
+        <div class="field">
+          <label for="inp-pin">PIN-koodi (4 numeroa)</label>
+          <input type="password" id="inp-pin" placeholder="••••" maxlength="4"
+                 inputmode="numeric" pattern="[0-9]{4}" autocomplete="current-password" />
+        </div>
+        <button class="btn btn-primary btn-full" id="name-submit" onclick="app.submitName()">
+          Kirjaudu →
         </button>
       </div>
     </div>`;
-  const inp = document.getElementById('inp-code');
-  inp.addEventListener('keydown', e => { if (e.key === 'Enter') app.submitCode(); });
-  setTimeout(() => inp.focus(), 50);
-}
-
-function renderNameForm() {
-  document.getElementById('auth-card').innerHTML = `
-    <div class="auth-sub">
-      Luo oma tunnus. <strong style="color:rgba(255,255,255,0.7)">Muista PIN-koodisi</strong> — tarvitset sitä seuraavalla kerralla.
-    </div>
-    <div class="field">
-      <label for="inp-name">Nimi</label>
-      <input type="text" id="inp-name" placeholder="Etunimi Sukunimi" autocomplete="name" />
-    </div>
-    <div class="field">
-      <label for="inp-pin">PIN-koodi (4 numeroa)</label>
-      <input type="password" id="inp-pin" placeholder="••••" maxlength="4"
-             inputmode="numeric" pattern="[0-9]{4}" autocomplete="new-password" />
-    </div>
-    <button class="btn btn-primary btn-full" id="name-submit" onclick="app.submitName()">
-      Aloita veikkaaminen →
-    </button>`;
   setTimeout(() => document.getElementById('inp-name')?.focus(), 50);
   document.getElementById('inp-pin').addEventListener('keydown', e => {
     if (e.key === 'Enter') app.submitName();
   });
 }
+
 
 function renderMainShell(root) {
   root.innerHTML = `<div class="main-content" id="main-view"></div>`;
@@ -483,13 +510,6 @@ async function renderOthers(el) {
 
 // ─── Toiminnot (globaalit, kutsutaan HTML:stä) ────────────────────────────────
 window.app = {
-  submitCode() {
-    const code = document.getElementById('inp-code')?.value.trim();
-    if (!code) { toast('Syötä pääsykoodi', true); return; }
-    if (code !== ACCESS_CODE) { toast('Väärä pääsykoodi', true); return; }
-    renderNameForm();
-  },
-
   async submitName() {
     const name = document.getElementById('inp-name')?.value.trim();
     const pin  = document.getElementById('inp-pin')?.value.trim();
@@ -503,12 +523,12 @@ window.app = {
 
     const err = await signInOrRegister(name, pin);
     if (err) {
-      const msg = err.message.includes('already registered')
-        ? 'Väärä PIN-koodi tälle nimelle'
+      const msg = err.message.includes('PIN') ? err.message
+        : err.message.includes('already registered') ? 'Väärä PIN-koodi tälle nimelle'
         : 'Virhe: ' + err.message;
       toast(msg, true);
       btn.disabled = false;
-      btn.textContent = 'Aloita veikkaaminen';
+      btn.textContent = 'Kirjaudu →';
     }
   },
 
