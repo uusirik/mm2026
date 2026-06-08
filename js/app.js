@@ -109,7 +109,7 @@ function nameToEmail(name) {
   const slug = name.toLowerCase()
     .replace(/ä/g,'a').replace(/ö/g,'o').replace(/å/g,'a')
     .replace(/\s+/g,'.').replace(/[^a-z0-9.]/g,'');
-  return `${slug}@afry2026.mm`;
+  return `${slug}@afry2026.test`;
 }
 
 // Salasana = rekisteröintitunnus + PIN
@@ -122,26 +122,40 @@ async function signInOrRegister(displayName, pin) {
   const email    = nameToEmail(displayName);
   const password = makePassword(inviteCode || 'noinvite', pin);
 
-  // Yritetään ensin kirjautua sisään (toimii ilman kutsulinkiä paluukerroilla)
+  // Yritetään ensin kirjautua sisään
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
-  // Uusi rekisteröinti — vaatii kutsulinkin
-  if (signInErr.message.includes('Invalid login credentials')) {
+  const msg = signInErr.message.toLowerCase();
+
+  // Väärä PIN (käyttäjä on olemassa, mutta salasana väärin)
+  if (msg.includes('invalid login') || msg.includes('invalid credentials') || msg.includes('invalid email or password')) {
     if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
+
+    // Uusi käyttäjä — rekisteröidään
     const { data, error: signUpErr } = await sb.auth.signUp({
       email,
       password,
       options: { data: { display_name: displayName } },
     });
-    if (signUpErr) return signUpErr;
-    if (data.user) {
+
+    if (signUpErr) {
+      console.error('signUp error:', signUpErr);
+      if (signUpErr.message.toLowerCase().includes('disabled'))
+        return new Error('Rekisteröityminen ei onnistu — tarkista Supabase-asetukset (Email provider / Confirm email)');
+      return signUpErr;
+    }
+
+    if (data?.user) {
       await sb.from('profiles')
         .update({ display_name: displayName })
         .eq('id', data.user.id);
     }
     return null;
   }
+
+  if (msg.includes('email not confirmed'))
+    return new Error('Sähköposti vahvistamatta — poista "Confirm email" käytöstä Supabasessa');
 
   return signInErr;
 }
@@ -520,14 +534,19 @@ window.app = {
     btn.disabled = true;
     btn.textContent = 'Kirjaudutaan…';
 
+    const reset = () => { btn.disabled = false; btn.textContent = 'Kirjaudu →'; };
+    const timeout = setTimeout(() => { reset(); toast('Aikakatkaisu — yritä uudelleen', true); }, 10000);
+
     const err = await signInOrRegister(name, pin);
+    clearTimeout(timeout);
+
     if (err) {
-      const msg = err.message.includes('PIN') ? err.message
+      const msg = err.message.includes('Rekisteröityminen') || err.message.includes('Sähköposti')
+        ? err.message
         : err.message.includes('already registered') ? 'Väärä PIN-koodi tälle nimelle'
-        : 'Virhe: ' + err.message;
+        : 'Kirjautuminen epäonnistui: ' + err.message;
       toast(msg, true);
-      btn.disabled = false;
-      btn.textContent = 'Kirjaudu →';
+      reset();
     }
   },
 
