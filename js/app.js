@@ -587,6 +587,7 @@ const NEWS_FEEDS = [
   { name: 'IS Urheilu',   url: 'https://www.is.fi/rss/urheilu.xml' },
   { name: 'IL Urheilu',   url: 'https://www.iltalehti.fi/rss/urheilu.xml' },
   { name: 'HS Urheilu',   url: 'https://www.hs.fi/rss/urheilu.xml' },
+  { name: 'SuomiFutis',   url: 'https://www.suomifutis.com/feed/', noFilter: true },
 ];
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
 const NEWS_CACHE_MS = 10 * 60 * 1000;
@@ -608,10 +609,10 @@ async function loadNews() {
     try {
       const res  = await fetch(`${RSS2JSON}${encodeURIComponent(feed.url)}`);
       const data = await res.json();
-      (data.items || []).forEach(item => all.push({ ...item, sourceName: feed.name }));
+      (data.items || []).forEach(item => all.push({ ...item, sourceName: feed.name, noFilter: feed.noFilter }));
     } catch { /* feed epäkäytettävissä, ohitetaan */ }
   }));
-  const filtered = all.filter(item => isFootballNews(item.title));
+  const filtered = all.filter(item => item.noFilter || isFootballNews(item.title));
   filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
   state.news = { items: filtered, fetchedAt: Date.now() };
   return filtered;
