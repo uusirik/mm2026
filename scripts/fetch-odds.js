@@ -111,6 +111,9 @@ function avgOdds(bookmakers, teamName, type) {
 async function fetchOddsApi() {
   const url = `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&dateFormat=iso`;
   const res = await fetch(url);
+  const remaining = res.headers.get('x-requests-remaining');
+  const used = res.headers.get('x-requests-used');
+  if (remaining != null) console.log(`Odds API: käytetty ${used}, jäljellä ${remaining} pyyntöä`);
   if (res.status === 404) {
     console.log('Laji ei ole vielä aktiivinen The Odds API:ssa — hypätään yli');
     return [];
