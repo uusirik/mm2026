@@ -122,42 +122,27 @@ async function signInOrRegister(displayName, pin) {
   const email    = nameToEmail(displayName);
   const password = makePassword(inviteCode || 'noinvite', pin);
 
-  // Yritetään ensin kirjautua sisään
+  // Yritetään kirjautua — onnistuu paluukerroilla
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
-  const msg = signInErr.message.toLowerCase();
+  // Kirjautuminen epäonnistui — yritetään rekisteröidä uutena käyttäjänä
+  if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
 
-  // Väärä PIN (käyttäjä on olemassa, mutta salasana väärin)
-  if (msg.includes('invalid login') || msg.includes('invalid credentials') || msg.includes('invalid email or password')) {
-    if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
+  const { data, error: signUpErr } = await sb.auth.signUp({
+    email,
+    password,
+    options: { data: { display_name: displayName } },
+  });
 
-    // Uusi käyttäjä — rekisteröidään
-    const { data, error: signUpErr } = await sb.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } },
-    });
-
-    if (signUpErr) {
-      console.error('signUp error:', signUpErr);
-      if (signUpErr.message.toLowerCase().includes('disabled'))
-        return new Error('Rekisteröityminen ei onnistu — tarkista Supabase-asetukset (Email provider / Confirm email)');
-      return signUpErr;
-    }
-
-    if (data?.user) {
-      await sb.from('profiles')
-        .update({ display_name: displayName })
-        .eq('id', data.user.id);
-    }
-    return null;
+  if (signUpErr) {
+    const m = signUpErr.message.toLowerCase();
+    if (m.includes('already') || m.includes('registered'))
+      return new Error('Väärä PIN-koodi tälle nimelle');
+    return signUpErr;
   }
 
-  if (msg.includes('email not confirmed'))
-    return new Error('Sähköposti vahvistamatta — poista "Confirm email" käytöstä Supabasessa');
-
-  return signInErr;
+  return null;
 }
 
 async function signOut() {
