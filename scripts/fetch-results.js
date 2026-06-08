@@ -174,9 +174,11 @@ async function main() {
     const oddsArr = comp.odds;
     if (oddsArr?.length && !sbM.result) {
       const o = oddsArr[0];
+      console.log(`  Odds raw (${homeFi} vs ${awayFi}):`, JSON.stringify(o));
       const homeOdds = mlToDecimal(o.homeTeamOdds?.moneyLine);
       const awayOdds = mlToDecimal(o.awayTeamOdds?.moneyLine);
       const drawOdds = mlToDecimal(o.drawOdds?.moneyLine);
+      console.log(`  → 1:${homeOdds} X:${drawOdds} 2:${awayOdds}`);
       if (homeOdds || drawOdds || awayOdds) {
         await patchMatch(sbM.id, {
           odds_home: homeOdds, odds_draw: drawOdds, odds_away: awayOdds,
