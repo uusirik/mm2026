@@ -1,18 +1,8 @@
 // fetch-results.js
-// Hakee MM 2026 tulokset ESPN:stä ja kertoimet Veikkauksen EBET-APIsta.
-// Ajetaan GitHub Actionsista 5 min välein.
+// Hakee MM 2026 tulokset ESPN:stä. Ajetaan GitHub Actionsista 5 min välein.
 
 const SUPABASE_URL = 'https://hwomgxbxcyrrjcwgjgtj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const VEIKKAUS_USER = process.env.VEIKKAUS_USERNAME;
-const VEIKKAUS_PASS = process.env.VEIKKAUS_PASSWORD;
-
-const VEIKKAUS_API = 'https://www.veikkaus.fi/api';
-const VEIKKAUS_HEADERS = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-  'X-ESA-API-Key': 'ROBOT',
-};
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
 
@@ -68,7 +58,6 @@ const TEAM_MAP = {
   'Paraguay':             'Paraguay',
 };
 
-// Lisäsynonyymit ESPN:n nimille
 const ALIASES = {
   'usa':                          'unitedstates',
   'unitedstatesofamerica':        'unitedstates',
@@ -87,7 +76,6 @@ function normalize(s) {
   return (s || '').toLowerCase().replace(/[^a-z]/g, '');
 }
 
-// Rakenna EN (normalisoitu) → FI-hakemisto
 const EN_TO_FI = {};
 for (const [fi, en] of Object.entries(TEAM_MAP)) {
   EN_TO_FI[normalize(en)] = fi;
@@ -101,7 +89,6 @@ function toFi(espnName) {
   return EN_TO_FI[key] || EN_TO_FI[ALIASES[key]];
 }
 
-// Muunna amerikkalainen kerroin desimaaliksi
 function mlToDecimal(ml) {
   if (ml == null) return null;
   const n = Number(ml);
@@ -110,8 +97,6 @@ function mlToDecimal(ml) {
   return Math.round(dec * 100) / 100;
 }
 
-// Palauttaa eilen + tänään + seuraavat 5 päivää YYYYMMDD-muodossa (UTC)
-// Eilinen = tulokset, tulevat = kertoimet etukäteen
 function getRelevantDates() {
   const now = new Date();
   return [-1, 0, 1, 2, 3, 4, 5].map(i => {
@@ -148,63 +133,6 @@ async function patchMatch(id, patch) {
   if (!res.ok) throw new Error(`Supabase-päivitysvirhe (${id}): ${res.status} ${await res.text()}`);
 }
 
-// ── Veikkaus EBET-kertoimet ───────────────────────────────────────────────────
-
-async function veikkausLogin() {
-  const res = await fetch(`${VEIKKAUS_API}/bff/v1/sessions`, {
-    method: 'POST',
-    headers: VEIKKAUS_HEADERS,
-    body: JSON.stringify({ type: 'STANDARD_LOGIN', login: VEIKKAUS_USER, password: VEIKKAUS_PASS }),
-  });
-  if (!res.ok) { console.warn(`Veikkaus login epäonnistui: ${res.status}`); return null; }
-  // Kerää session-cookiet
-  const cookies = (res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie')].filter(Boolean))
-    .map(c => c.split(';')[0]).join('; ');
-  console.log('Veikkaus: kirjautuminen onnistui');
-  return cookies;
-}
-
-async function fetchVeikkausOdds(cookie) {
-  const hdrs = { ...VEIKKAUS_HEADERS, Cookie: cookie };
-  const probe = [
-    '/sport-open-games/v1/draws?game=EBET',
-    '/sport-open-games/v2/games/EBET/draws',
-    '/sport-open-games/v1/games/EBET',
-    '/bff/v1/sport-games/EBET/draws',
-  ];
-  for (const path of probe) {
-    const r = await fetch(`${VEIKKAUS_API}${path}`, { headers: hdrs });
-    const t = await r.text();
-    console.log(`${path} → ${r.status}: ${t.slice(0, 200)}`);
-  }
-
-  const res = await fetch(`${VEIKKAUS_API}/sport-open-games/v1/games/EBET/draws`, {
-    headers: hdrs,
-  });
-  if (res.status === 204 || !res.ok) { console.warn(`Veikkaus: ${res.status}`); return []; }
-  const data = JSON.parse(await res.text());
-  // Pura kaikki 1X2-rivit
-  const games = [];
-  for (const draw of (data.draws ?? [])) {
-    for (const row of (draw.rows ?? [])) {
-      if (row.type !== '1X2') continue;
-      const comps = row.competitors ?? [];
-      const home = comps.find(c => c.id === '1');
-      const away = comps.find(c => c.id === '2');
-      const draw_ = comps.find(c => c.id === '3');
-      if (!home || !away) continue;
-      games.push({
-        home: home.name,
-        away: away.name,
-        odds_home: home.odds?.odds ?? null,
-        odds_draw: draw_?.odds?.odds ?? null,
-        odds_away: away.odds?.odds ?? null,
-      });
-    }
-  }
-  return games;
-}
-
 async function main() {
   if (!SUPABASE_KEY) { console.error('SUPABASE_SERVICE_ROLE_KEY puuttuu'); process.exit(1); }
 
@@ -218,32 +146,6 @@ async function main() {
   let updatedResults = 0;
   let updatedOdds    = 0;
 
-  // ── Veikkaus-kertoimet (1X2 desimaalit) ────────────────────────────────────
-  if (VEIKKAUS_USER && VEIKKAUS_PASS) {
-    try {
-      const cookie = await veikkausLogin();
-      if (cookie) {
-        const vGames = await fetchVeikkausOdds(cookie);
-        console.log(`Veikkaus: ${vGames.length} 1X2-peliä`);
-        for (const g of vGames) {
-          const sbM = sbIndex.get(`${g.home}|${g.away}`);
-          if (!sbM || sbM.result) continue;
-          if (g.odds_home || g.odds_draw || g.odds_away) {
-            await patchMatch(sbM.id, {
-              odds_home: g.odds_home, odds_draw: g.odds_draw, odds_away: g.odds_away,
-              odds_updated_at: new Date().toISOString(),
-            });
-            console.log(`  ✓ ${g.home}: 1:${g.odds_home} X:${g.odds_draw} 2:${g.odds_away}`);
-            updatedOdds++;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Veikkaus-kertoimet epäonnistuivat:', e.message);
-    }
-  }
-
-  // ── ESPN-tulokset ──────────────────────────────────────────────────────────
   for (const event of events) {
     const comp = event.competitions?.[0];
     if (!comp) continue;
@@ -262,8 +164,8 @@ async function main() {
     const sbM = sbIndex.get(`${homeFi}|${awayFi}`);
     if (!sbM) { console.warn(`  Ei vastaavuutta: ${homeFi} – ${awayFi}`); continue; }
 
-    // ESPN draw-kerroin varmuuskopiona jos Veikkaus ei ole käytössä
-    if (!VEIKKAUS_USER && !sbM.result) {
+    // ESPN-kertoimet (DraftKings, tulee lähempänä ottelua)
+    if (!sbM.result) {
       const oddsArr = comp.odds;
       if (oddsArr?.length) {
         const o = oddsArr[0];
@@ -275,12 +177,13 @@ async function main() {
             odds_home: homeOdds, odds_draw: drawOdds, odds_away: awayOdds,
             odds_updated_at: new Date().toISOString(),
           });
+          console.log(`  Kertoimet ${homeFi}: 1:${homeOdds??'–'} X:${drawOdds??'–'} 2:${awayOdds??'–'}`);
           updatedOdds++;
         }
       }
     }
 
-    // ── Tulos (vain kun ottelu on päättynyt) ──────────────────────────────
+    // Tulos (vain kun ottelu on päättynyt)
     const completed = event.status?.type?.completed;
     if (!completed) continue;
 

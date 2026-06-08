@@ -15,9 +15,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Hae tulokset ja kertoimet (ESPN + Veikkaus)
+      - name: Hae tulokset ja kertoimet (ESPN)
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          VEIKKAUS_USERNAME: ${{ secrets.VEIKKAUS_USERNAME }}
-          VEIKKAUS_PASSWORD: ${{ secrets.VEIKKAUS_PASSWORD }}
         run: node scripts/fetch-results.js
