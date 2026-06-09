@@ -5,6 +5,10 @@ on:
     - cron: '*/5 * * * *'   # joka 5. minuutti
   workflow_dispatch:          # voi ajaa käsin
 
+concurrency:
+  group: fetch-results
+  cancel-in-progress: false
+
 jobs:
   fetch:
     runs-on: ubuntu-latest

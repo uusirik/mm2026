@@ -834,7 +834,6 @@ function updateStats() {
   const betCnt = Object.keys(state.bets).length;
   const total  = matchList.length;
   const pts    = getTotalPoints();
-  const sv = document.querySelector('.stat-val:nth-child(1)');
   const el = document.querySelectorAll('.stat-val');
   if (el[0]) el[0].textContent = betCnt;
   if (el[2]) el[2].textContent = pts;

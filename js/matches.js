@@ -50,7 +50,7 @@ export const MATCHES = [
   {id:'L4',g:'L',h:'Panama',a:'Kroatia',dt:'2026-06-23T23:00:00Z'},
   {id:'K4',g:'K',h:'Kolumbia',a:'Kongon DT',dt:'2026-06-24T02:00:00Z'},
   {id:'B5',g:'B',h:'Sveitsi',a:'Kanada',dt:'2026-06-24T19:00:00Z'},
-  {id:'B6',g:'B',h:'Bosn. & Hertseg.',a:'Qatar',dt:'2026-06-24T19:00:00Z'},
+  {id:'B6',g:'B',h:'Bosnia & Hertsegovina',a:'Qatar',dt:'2026-06-24T19:00:00Z'},
   {id:'C5',g:'C',h:'Skotlanti',a:'Brasilia',dt:'2026-06-24T22:00:00Z'},
   {id:'C6',g:'C',h:'Marokko',a:'Haiti',dt:'2026-06-24T22:00:00Z'},
   {id:'A5',g:'A',h:'Tšekki',a:'Meksiko',dt:'2026-06-25T01:00:00Z'},
