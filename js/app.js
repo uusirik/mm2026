@@ -652,6 +652,17 @@ function timeAgo(dateStr) {
   return `${Math.floor(h / 24)} pv sitten`;
 }
 
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function safeUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? url : '#';
+  } catch { return '#'; }
+}
+
 async function renderNews(el) {
   el.innerHTML = '<div class="loading"><div class="spinner"></div> Ladataan uutisia…</div>';
   const items = await loadNews();
@@ -662,9 +673,9 @@ async function renderNews(el) {
   el.innerHTML = `
     <div class="news-list">
       ${items.slice(0, 30).map(item => `
-        <a class="news-card" href="${item.link}" target="_blank" rel="noopener">
-          <div class="news-title">${item.title}</div>
-          <div class="news-meta">${item.sourceName} · ${timeAgo(item.pubDate)}</div>
+        <a class="news-card" href="${safeUrl(item.link)}" target="_blank" rel="noopener noreferrer">
+          <div class="news-title">${esc(item.title)}</div>
+          <div class="news-meta">${esc(item.sourceName)} · ${timeAgo(item.pubDate)}</div>
         </a>`).join('')}
     </div>`;
 }
