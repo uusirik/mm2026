@@ -104,7 +104,7 @@ function debounceSave(matchId) {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 // SHA-256 tiiviste kutsukoodeista — itse koodi on vain URL-fragmentissa (#...)
 const INVITE_HASHES = new Set([
-  '0556e8c64c72a62f4b6029a8a42cace0fedaf9ed1f1c69794f4d47864642dc29',
+  '8b345f1b0e4072637dcbc1c0bca1996dc5b955ad8ddcb9de04728ee5ceec0230',
 ]);
 const INVITE_KEY = 'mm2026_invited';
 const LOCKOUT_KEY = 'mm2026_lockout';
