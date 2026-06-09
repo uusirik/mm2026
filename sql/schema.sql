@@ -16,11 +16,11 @@ create table if not exists public.matches (
   home text not null,
   away text not null,
   kickoff timestamptz not null,
+  tbd boolean default false,
   result text check (result in ('1','x','2')),
   home_goals integer,
   away_goals integer,
   extra_time boolean default false,
-  -- Kertoimet (haetaan automaattisesti ESPN API:sta)
   odds_home numeric,
   odds_draw numeric,
   odds_away numeric,
