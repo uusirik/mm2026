@@ -107,6 +107,17 @@ const INVITE_HASHES = new Set([
   '0556e8c64c72a62f4b6029a8a42cace0fedaf9ed1f1c69794f4d47864642dc29',
 ]);
 const INVITE_KEY = 'mm2026_invited';
+const LOCKOUT_KEY = 'mm2026_lockout';
+const ATTEMPTS_KEY = 'mm2026_attempts';
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 5 * 60 * 1000; // 5 minuuttia
+
+function shortName(full) {
+  if (!full) return '?';
+  const parts = full.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -694,7 +705,7 @@ function renderLeaderboard(el) {
     return `
       <div class="lb-row">
         <span class="lb-rank ${rankCls}">${i+1}.</span>
-        <span class="lb-name ${isMe?'me':''}">${row.display_name}</span>
+        <span class="lb-name ${isMe?'me':''}">${isMe ? row.display_name : shortName(row.display_name)}</span>
         <span class="lb-num">${row.bets_placed}</span>
         <span class="lb-num">${row.exact_results}</span>
         <span class="lb-points">${row.total_points} p</span>
@@ -756,8 +767,9 @@ async function renderOthers(el) {
             const b = u.bets[m.id];
             if (!b) return '';
             const cls = { '1': 'r1', 'x': 'rx', '2': 'r2' }[b.prediction];
+            const isMe = Object.keys(byUser).find(id => byUser[id] === u) === state.user?.id;
             return `<div class="other-chip">
-              <span class="other-chip-name">${u.name}</span>
+              <span class="other-chip-name">${isMe ? u.name : shortName(u.name)}</span>
               <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>
             </div>`;
           }).filter(Boolean).join('');
@@ -786,6 +798,14 @@ window.app = {
     if (!name) { toast('Syötä nimesi', true); return; }
     if (!/^\d{4}$/.test(pin)) { toast('PIN-koodi on 4 numeroa', true); return; }
 
+    // Tarkista lukitus
+    const lockUntil = parseInt(localStorage.getItem(LOCKOUT_KEY) || '0');
+    if (Date.now() < lockUntil) {
+      const secs = Math.ceil((lockUntil - Date.now()) / 1000);
+      toast(`Liian monta yritystä — odota ${secs} s`, true);
+      return;
+    }
+
     const btn = document.getElementById('name-submit');
     btn.disabled = true;
     btn.textContent = 'Kirjaudutaan…';
@@ -797,12 +817,24 @@ window.app = {
     clearTimeout(timeout);
 
     if (err) {
-      const msg = err.message.includes('Rekisteröityminen') || err.message.includes('Sähköposti')
-        ? err.message
-        : err.message.includes('already registered') ? 'Väärä PIN-koodi tälle nimelle'
-        : 'Kirjautuminen epäonnistui: ' + err.message;
-      toast(msg, true);
+      // Laske epäonnistuneet yritykset
+      const attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0') + 1;
+      if (attempts >= MAX_ATTEMPTS) {
+        localStorage.setItem(LOCKOUT_KEY, String(Date.now() + LOCKOUT_MS));
+        localStorage.setItem(ATTEMPTS_KEY, '0');
+        toast('Liian monta väärää yritystä — odota 5 minuuttia', true);
+      } else {
+        localStorage.setItem(ATTEMPTS_KEY, String(attempts));
+        const msg = err.message.includes('Rekisteröityminen') || err.message.includes('Sähköposti')
+          ? err.message
+          : err.message.includes('already registered') ? `Väärä PIN-koodi (${attempts}/${MAX_ATTEMPTS})`
+          : 'Kirjautuminen epäonnistui: ' + err.message;
+        toast(msg, true);
+      }
       reset();
+    } else {
+      localStorage.setItem(ATTEMPTS_KEY, '0');
+      localStorage.removeItem(LOCKOUT_KEY);
     }
   },
 
