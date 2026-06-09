@@ -706,7 +706,7 @@ function renderLeaderboard(el) {
     return `
       <div class="lb-row">
         <span class="lb-rank ${rankCls}">${i+1}.</span>
-        <span class="lb-name ${isMe?'me':''}">${isMe ? row.display_name : shortName(row.display_name)}</span>
+        <span class="lb-name ${isMe?'me':''}">${shortName(row.display_name)}</span>
         <span class="lb-num">${row.bets_placed}</span>
         <span class="lb-num">${row.exact_results}</span>
         <span class="lb-points">${row.total_points} p</span>
