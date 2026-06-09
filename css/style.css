@@ -611,6 +611,16 @@ body {
   margin-bottom: 1.25rem;
   overflow: hidden;
 }
+.next-match-card--subsequent {
+  margin-top: -0.85rem;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.next-match-card--subsequent::before { display: none; }
+.next-match-card:has(+ .next-match-card--subsequent) {
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin-bottom: 0;
+}
 
 .next-match-card::before {
   content: '';

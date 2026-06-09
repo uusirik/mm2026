@@ -324,64 +324,72 @@ const GROUP_ORDER = {
   R32:13, R16:14, QF:15, SF:16, '3P':17, FIN:18,
 };
 
-function getNextMatch() {
+function getNextMatches() {
   const list = state.matches.length ? state.matches : MATCHES;
-  return list
+  const upcoming = list
     .filter(m => !m.result && !m.tbd && new Date(m.kickoff || m.dt) > Date.now() - 2 * 36e5)
-    .sort((a, b) => new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt))[0] || null;
+    .sort((a, b) => new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt));
+  if (!upcoming.length) return [];
+  const firstKickoff = new Date(upcoming[0].kickoff || upcoming[0].dt).getTime();
+  // Kaikki saman alkamisajan ottelut (toleranssi 5 min)
+  return upcoming.filter(m => new Date(m.kickoff || m.dt) - firstKickoff < 5 * 60 * 1000);
 }
 
 function renderNextMatchCard() {
-  const m = getNextMatch();
-  if (!m) return '';
+  const matches = getNextMatches();
+  if (!matches.length) return '';
 
-  const home    = m.home  || m.h;
-  const away    = m.away  || m.a;
-  const kickoff = m.kickoff || m.dt;
-  const group   = m.group_name || m.g;
-  const mData   = getMatchData(m.id);
-  const bet     = state.bets[m.id];
+  const label = matches.length > 1 ? 'SEURAAVAT OTTELUT' : 'SEURAAVA OTTELU';
 
-  const hasOdds = mData?.odds_home || mData?.odds_draw || mData?.odds_away;
-  const oddsHtml = hasOdds ? `
-    <div class="nm-odds">
-      <div class="nm-odds-item"><span class="nm-odds-lbl">1</span><span class="nm-odds-val">${mData.odds_home}</span></div>
-      <div class="nm-odds-sep">·</div>
-      <div class="nm-odds-item"><span class="nm-odds-lbl">X</span><span class="nm-odds-val">${mData.odds_draw ?? '–'}</span></div>
-      <div class="nm-odds-sep">·</div>
-      <div class="nm-odds-item"><span class="nm-odds-lbl">2</span><span class="nm-odds-val">${mData.odds_away}</span></div>
-    </div>` : '';
+  return matches.map((m, i) => {
+    const home    = m.home  || m.h;
+    const away    = m.away  || m.a;
+    const kickoff = m.kickoff || m.dt;
+    const group   = m.group_name || m.g;
+    const mData   = getMatchData(m.id);
+    const bet     = state.bets[m.id];
 
-  const actionHtml = bet
-    ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
-    : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`;
+    const hasOdds = mData?.odds_home || mData?.odds_draw || mData?.odds_away;
+    const oddsHtml = hasOdds ? `
+      <div class="nm-odds">
+        <div class="nm-odds-item"><span class="nm-odds-lbl">1</span><span class="nm-odds-val">${mData.odds_home ?? '–'}</span></div>
+        <div class="nm-odds-sep">·</div>
+        <div class="nm-odds-item"><span class="nm-odds-lbl">X</span><span class="nm-odds-val">${mData.odds_draw ?? '–'}</span></div>
+        <div class="nm-odds-sep">·</div>
+        <div class="nm-odds-item"><span class="nm-odds-lbl">2</span><span class="nm-odds-val">${mData.odds_away ?? '–'}</span></div>
+      </div>` : '';
 
-  return `
-    <div class="next-match-card">
-      <div class="nm-header">
-        <span class="nm-label">SEURAAVA OTTELU</span>
-        <span class="nm-group">Lohko ${group}</span>
-      </div>
-      <div class="nm-teams">
-        <div class="nm-team">
-          <span class="nm-flag">${flagImg(home, 48)}</span>
-          <span class="nm-name">${home}</span>
+    const actionHtml = bet
+      ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
+      : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`;
+
+    return `
+      <div class="next-match-card${i > 0 ? ' next-match-card--subsequent' : ''}">
+        <div class="nm-header">
+          <span class="nm-label">${i === 0 ? label : ''}</span>
+          <span class="nm-group">Lohko ${group}</span>
         </div>
-        <div class="nm-center">
-          <div class="nm-vs">VS</div>
-          <div class="nm-countdown" data-kickoff="${kickoff}">–</div>
+        <div class="nm-teams">
+          <div class="nm-team">
+            <span class="nm-flag">${flagImg(home, 48)}</span>
+            <span class="nm-name">${home}</span>
+          </div>
+          <div class="nm-center">
+            <div class="nm-vs">VS</div>
+            <div class="nm-countdown" data-kickoff="${kickoff}">–</div>
+          </div>
+          <div class="nm-team">
+            <span class="nm-flag">${flagImg(away, 48)}</span>
+            <span class="nm-name">${away}</span>
+          </div>
         </div>
-        <div class="nm-team">
-          <span class="nm-flag">${flagImg(away, 48)}</span>
-          <span class="nm-name">${away}</span>
+        ${oddsHtml}
+        <div class="nm-footer">
+          <span class="nm-date">${fmtDate(kickoff)}</span>
+          ${actionHtml}
         </div>
-      </div>
-      ${oddsHtml}
-      <div class="nm-footer">
-        <span class="nm-date">${fmtDate(kickoff)}</span>
-        ${actionHtml}
-      </div>
-    </div>`;
+      </div>`;
+  }).join('');
 }
 
 function startCountdown() {
