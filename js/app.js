@@ -159,9 +159,10 @@ async function signInOrRegister(displayName, pin) {
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
-  // Kirjautuminen epäonnistui — yritetään rekisteröidä uutena käyttäjänä
-  if (!invited) return new Error('Rekisteröityminen vaatii kutsulinkkin');
+  // Kirjautuminen epäonnistui — jos ei kutsulinkkiä, kyse on väärästä PIN-koodista
+  if (!invited) return new Error('Väärä nimi tai PIN-koodi');
 
+  // Kutsulinkkiä löytyy — yritetään rekisteröidä uutena käyttäjänä
   const { error: signUpErr } = await sb.auth.signUp({
     email,
     password,
@@ -825,10 +826,11 @@ window.app = {
         toast('Liian monta väärää yritystä — odota 5 minuuttia', true);
       } else {
         localStorage.setItem(ATTEMPTS_KEY, String(attempts));
-        const msg = err.message.includes('Rekisteröityminen') || err.message.includes('Sähköposti')
-          ? err.message
-          : err.message.includes('already registered') ? `Väärä PIN-koodi (${attempts}/${MAX_ATTEMPTS})`
-          : 'Kirjautuminen epäonnistui: ' + err.message;
+        const msg = err.message.includes('already registered')
+          ? `Väärä PIN-koodi (${attempts}/${MAX_ATTEMPTS})`
+          : err.message.includes('epäonnistui') || err.message.includes('vaatii') || err.message.includes('Väärä')
+          ? `${err.message} (${attempts}/${MAX_ATTEMPTS})`
+          : `Kirjautuminen epäonnistui (${attempts}/${MAX_ATTEMPTS})`;
         toast(msg, true);
       }
       reset();
