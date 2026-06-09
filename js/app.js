@@ -120,7 +120,6 @@ async function checkInvite() {
   const hash = await sha256(fragment);
   if (INVITE_HASHES.has(hash)) {
     localStorage.setItem(INVITE_KEY, '1');
-    localStorage.setItem('mm2026_invite_fragment', fragment);
     history.replaceState(null, '', window.location.pathname);
     return true;
   }
@@ -141,7 +140,7 @@ function makePassword(pin) {
 }
 
 async function signInOrRegister(displayName, pin) {
-  const inviteCode = localStorage.getItem('mm2026_invite_fragment') || '';
+  const invited  = localStorage.getItem(INVITE_KEY);
   const email    = nameToEmail(displayName);
   const password = makePassword(pin);
 
@@ -150,7 +149,7 @@ async function signInOrRegister(displayName, pin) {
   if (!signInErr) return null;
 
   // Kirjautuminen epäonnistui — yritetään rekisteröidä uutena käyttäjänä
-  if (!inviteCode) return new Error('Rekisteröityminen vaatii kutsulinkkin');
+  if (!invited) return new Error('Rekisteröityminen vaatii kutsulinkkin');
 
   const { error: signUpErr } = await sb.auth.signUp({
     email,
