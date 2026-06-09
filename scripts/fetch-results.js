@@ -156,19 +156,24 @@ async function main() {
     const sbM = sbIndex.get(`${homeFi}|${awayFi}`);
     if (!sbM) { console.warn(`  Ei vastaavuutta: ${homeFi} – ${awayFi}`); continue; }
 
-    // Tulos (vain kun ottelu on päättynyt)
-    const completed = event.status?.type?.completed;
-    if (!completed) continue;
+    const completed  = event.status?.type?.completed;
+    const inProgress = event.status?.type?.state === 'in';
+    if (!completed && !inProgress) continue;
 
     const hg = parseInt(homeComp.score) || 0;
     const ag = parseInt(awayComp.score) || 0;
 
-    if (sbM.result !== null && sbM.home_goals === hg && sbM.away_goals === ag) continue;
-
-    const result = hg > ag ? '1' : ag > hg ? '2' : 'x';
-    console.log(`  ✓ ${homeFi} ${hg}–${ag} ${awayFi} → ${result}`);
-    await patchMatch(sbM.id, { result, home_goals: hg, away_goals: ag });
-    updatedResults++;
+    if (completed) {
+      if (sbM.result !== null && sbM.home_goals === hg && sbM.away_goals === ag) continue;
+      const result = hg > ag ? '1' : ag > hg ? '2' : 'x';
+      console.log(`  ✓ ${homeFi} ${hg}–${ag} ${awayFi} → ${result}`);
+      await patchMatch(sbM.id, { result, home_goals: hg, away_goals: ag });
+      updatedResults++;
+    } else {
+      if (sbM.home_goals === hg && sbM.away_goals === ag) continue;
+      console.log(`  ⚽ ${homeFi} ${hg}–${ag} ${awayFi} (käynnissä)`);
+      await patchMatch(sbM.id, { home_goals: hg, away_goals: ag });
+    }
   }
 
   console.log(`Valmis. Tuloksia päivitetty: ${updatedResults}`);

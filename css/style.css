@@ -526,6 +526,18 @@ body {
 
 .lb-points { font-size: 16px; font-weight: 600; color: var(--text); text-align: right; }
 
+.lb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.lb-card-title {
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
 /* ── Vertailu-näkymä ────────────────────────────────────────────────────────── */
 .others-view { padding-top: 0.5rem; user-select: none; cursor: default; }
 .others-group { margin-bottom: 1.5rem; }
@@ -702,6 +714,47 @@ body {
 }
 
 .nm-countdown.live { color: var(--green); }
+
+.nm-live-score { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.nm-score { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: 2px; }
+.nm-elapsed {
+  font-size: 11px; font-weight: 700; color: var(--green);
+  background: var(--green-bg); border-radius: 4px;
+  padding: 1px 7px; letter-spacing: .04em;
+}
+.nm-elapsed.ht { color: var(--amber); background: var(--amber-bg); }
+
+.nm-stakes-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none;
+  border: none; border-top: 1px solid var(--border);
+  padding: 0.45rem 0 0; margin-top: 0.5rem;
+  cursor: pointer; color: var(--text2);
+  font-size: 11px; font-weight: 600; letter-spacing: .04em;
+}
+.nm-stakes-toggle:hover { color: var(--text); }
+.nm-stakes-arrow { transition: transform .2s; font-size: 9px; }
+.nm-stakes-toggle.open .nm-stakes-arrow { transform: rotate(180deg); }
+
+.nm-stakes-list { display: none; flex-direction: column; gap: 4px; padding: 0.5rem 0 0.1rem; }
+.nm-stakes-list.open { display: flex; }
+
+.nm-stake-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; font-size: 12px;
+}
+.nm-stake-row.winning { background: var(--green-bg); border-color: rgba(34,197,94,0.2); }
+.nm-stake-row.partial { background: var(--amber-bg); border-color: rgba(245,158,11,0.2); }
+.nm-stake-row.losing  { background: var(--red-bg);   border-color: rgba(239,68,68,0.15); }
+.nm-stake-left { display: flex; align-items: center; gap: 8px; }
+.nm-stake-name { font-weight: 500; color: var(--text); }
+.nm-stake-score { color: var(--text2); }
+.nm-stake-you { color: var(--indigo); font-size: 11px; }
+.nm-stake-pts { font-size: 13px; font-weight: 700; }
+.winning .nm-stake-pts { color: var(--green); }
+.partial .nm-stake-pts { color: var(--amber); }
+.losing  .nm-stake-pts { color: var(--red); }
 
 .nm-odds {
   display: flex;

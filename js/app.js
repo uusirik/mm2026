@@ -359,8 +359,18 @@ function renderNextMatchCard() {
     const group   = m.group_name || m.g;
     const mData   = getMatchData(m.id);
     const bet     = state.bets[m.id];
+    const locked  = isLocked(m);
+    const live    = locked && !mData?.result;
 
-    const hasOdds = mData?.odds_home || mData?.odds_draw || mData?.odds_away;
+    const centerHtml = live
+      ? `<div class="nm-live-score">
+           <div class="nm-score">${mData?.home_goals ?? 0} – ${mData?.away_goals ?? 0}</div>
+           <div class="nm-elapsed" data-kickoff="${kickoff}">–</div>
+         </div>`
+      : `<div class="nm-vs">VS</div>
+         <div class="nm-countdown" data-kickoff="${kickoff}">–</div>`;
+
+    const hasOdds = !live && (mData?.odds_home || mData?.odds_draw || mData?.odds_away);
     const oddsHtml = hasOdds ? `
       <div class="nm-odds">
         <div class="nm-odds-item"><span class="nm-odds-lbl">1</span><span class="nm-odds-val">${mData.odds_home ?? '–'}</span></div>
@@ -370,9 +380,20 @@ function renderNextMatchCard() {
         <div class="nm-odds-item"><span class="nm-odds-lbl">2</span><span class="nm-odds-val">${mData.odds_away ?? '–'}</span></div>
       </div>` : '';
 
-    const actionHtml = bet
-      ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
-      : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`;
+    const actionHtml = locked
+      ? (bet
+          ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
+          : `<div class="locked-badge"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Suljettu</div>`)
+      : (bet
+          ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
+          : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`);
+
+    const stakesHtml = live ? `
+      <button class="nm-stakes-toggle" onclick="app.toggleStakes(this,'${m.id}')">
+        <span>Veikkaukset tällä tuloksella</span>
+        <span class="nm-stakes-arrow">▼</span>
+      </button>
+      <div class="nm-stakes-list" id="stakes-${m.id}"></div>` : '';
 
     return `
       <div class="next-match-card${i > 0 ? ' next-match-card--subsequent' : ''}">
@@ -385,10 +406,7 @@ function renderNextMatchCard() {
             <span class="nm-flag">${flagImg(home, 48)}</span>
             <span class="nm-name">${home}</span>
           </div>
-          <div class="nm-center">
-            <div class="nm-vs">VS</div>
-            <div class="nm-countdown" data-kickoff="${kickoff}">–</div>
-          </div>
+          <div class="nm-center">${centerHtml}</div>
           <div class="nm-team">
             <span class="nm-flag">${flagImg(away, 48)}</span>
             <span class="nm-name">${away}</span>
@@ -399,6 +417,7 @@ function renderNextMatchCard() {
           <span class="nm-date">${fmtDate(kickoff)}</span>
           ${actionHtml}
         </div>
+        ${stakesHtml}
       </div>`;
   }).join('');
 }
@@ -407,6 +426,14 @@ function startCountdown() {
   if (_countdownTimer) clearInterval(_countdownTimer);
   _countdownTimer = setInterval(tickCountdowns, 1000);
   tickCountdowns();
+}
+
+function calcElapsed(kickoff) {
+  const min = Math.floor((Date.now() - new Date(kickoff)) / 60000);
+  if (min < 0) return null;
+  if (min <= 45) return `${min}'`;
+  if (min <= 60) return 'HT';
+  return `${Math.min(min - 15, 90)}'`;
 }
 
 function tickCountdowns() {
@@ -424,6 +451,12 @@ function tickCountdowns() {
     if (d > 0)       el.textContent = `${d} pv ${h} t`;
     else if (h > 0)  el.textContent = `${h} t ${min} min`;
     else             el.textContent = `${min}:${String(s).padStart(2,'0')}`;
+  });
+  document.querySelectorAll('.nm-elapsed[data-kickoff]').forEach(el => {
+    const t = calcElapsed(el.dataset.kickoff);
+    if (!t) return;
+    el.textContent = t;
+    el.classList.toggle('ht', t === 'HT');
   });
 }
 
@@ -686,8 +719,51 @@ async function renderNews(el) {
     </div>`;
 }
 
+// ─── Stakes-dropdown (live-ottelut) ──────────────────────────────────────────
+const _stakesCache = {};
+
+async function toggleStakes(btn, matchId) {
+  const list = document.getElementById(`stakes-${matchId}`);
+  if (!list) return;
+  const isOpen = list.classList.contains('open');
+  list.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  if (isOpen || _stakesCache[matchId]) {
+    if (_stakesCache[matchId]) list.innerHTML = renderStakesRows(matchId);
+    return;
+  }
+  list.innerHTML = '<div style="padding:8px;color:var(--text3);font-size:12px">Ladataan...</div>';
+  const { data } = await sb.from('bets').select('*, profiles(id,display_name)').eq('match_id', matchId);
+  if (!data) { list.innerHTML = ''; return; }
+  const match = state.matches.find(m => m.id === matchId);
+  const hg = match?.home_goals ?? 0;
+  const ag = match?.away_goals ?? 0;
+  const currentResult = hg > ag ? '1' : ag > hg ? '2' : 'x';
+  _stakesCache[matchId] = data
+    .map(b => {
+      const { points } = calcPoints(b, { result: currentResult, home_goals: hg, away_goals: ag, extra_time: false });
+      const isMe = b.user_id === state.user?.id;
+      return { name: isMe ? b.profiles?.display_name : shortName(b.profiles?.display_name || '?'), score: `${b.home_goals}–${b.away_goals}`, points: points ?? 0, isMe };
+    })
+    .sort((a, b) => b.points - a.points);
+  list.innerHTML = renderStakesRows(matchId);
+}
+
+function renderStakesRows(matchId) {
+  return (_stakesCache[matchId] || []).map(s => {
+    const cls = s.points >= 4 ? 'winning' : s.points >= 1 ? 'partial' : 'losing';
+    return `<div class="nm-stake-row ${cls}">
+      <div class="nm-stake-left">
+        <span class="nm-stake-name">${s.name}${s.isMe ? ' <span class="nm-stake-you">(sinä)</span>' : ''}</span>
+        <span class="nm-stake-score">${s.score}</span>
+      </div>
+      <span class="nm-stake-pts">${s.points}p</span>
+    </div>`;
+  }).join('');
+}
+
 // ─── Pistetaulukko ────────────────────────────────────────────────────────────
-function renderLeaderboard(el) {
+async function renderLeaderboard(el) {
   if (!state.leaderboard.length) {
     loadLeaderboard().then(() => renderView());
     el.innerHTML = '<div class="loading"><div class="spinner"></div> Ladataan...</div>';
@@ -717,7 +793,114 @@ function renderLeaderboard(el) {
         <span style="text-align:right">Pisteet</span>
       </div>
       ${rows || '<div class="loading">Ei tietoja vielä.</div>'}
+    </div>
+    <div id="lb-extras"></div>`;
+
+  const completedMatches = state.matches.filter(m => m.result).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  if (!completedMatches.length) return;
+
+  const { data: allBets } = await sb.from('bets').select('*, profiles(id,display_name)');
+  if (!allBets) return;
+
+  const byUser = {};
+  allBets.forEach(b => {
+    if (!byUser[b.user_id]) byUser[b.user_id] = { id: b.user_id, name: b.profiles?.display_name || '?', bets: {} };
+    byUser[b.user_id].bets[b.match_id] = b;
+  });
+
+  const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#a78bfa','#38bdf8','#fb923c','#94a3b8','#f472b6','#34d399'];
+
+  const breakdown = Object.values(byUser).map(u => {
+    const c = { p4:0, p3:0, p2:0, p1:0, p0:0 };
+    completedMatches.forEach(m => {
+      const b = u.bets[m.id];
+      if (!b) return;
+      const { points } = calcPoints(b, m);
+      if (points === null) return;
+      c[`p${points}`] = (c[`p${points}`] || 0) + 1;
+    });
+    return { ...c, name: shortName(u.name), isMe: u.id === state.user?.id };
+  }).sort((a, b) => (b.p4*4+b.p3*3+b.p2*2+b.p1) - (a.p4*4+a.p3*3+a.p2*2+a.p1));
+
+  const labels = ['Start', ...completedMatches.map(m => {
+    const d = new Date(m.kickoff);
+    return `${d.getUTCDate()}.${d.getUTCMonth()+1}.`;
+  })];
+
+  const datasets = Object.values(byUser).map((u, idx) => {
+    const isMe = u.id === state.user?.id;
+    let cum = 0;
+    return {
+      label: shortName(u.name),
+      data: [0, ...completedMatches.map(m => {
+        const b = u.bets[m.id];
+        if (b) cum += calcPoints(b, m).points || 0;
+        return cum;
+      })],
+      borderColor: COLORS[idx % COLORS.length],
+      backgroundColor: COLORS[idx % COLORS.length] + '18',
+      borderWidth: isMe ? 2.5 : 1.5,
+      pointRadius: isMe ? 4 : 2.5,
+      pointHoverRadius: 6,
+      tension: 0.35,
+      fill: false,
+    };
+  });
+
+  const extrasEl = document.getElementById('lb-extras');
+  if (!extrasEl) return;
+
+  const hdStyle = 'text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;padding:0 4px';
+  const cell = (val, pts) => {
+    let s = 'text-align:center;display:block;font-size:13px;';
+    if (val === 0) s += 'color:var(--text3)';
+    else if (pts === 4) s += 'color:var(--green);font-weight:700';
+    else if (pts === 3) s += 'color:var(--indigo);font-weight:600';
+    else if (pts === 2) s += 'color:var(--amber)';
+    else s += 'color:var(--text2)';
+    return `<span style="${s}">${val > 0 ? val : '–'}</span>`;
+  };
+
+  extrasEl.innerHTML = `
+    <div class="lb-card" style="margin-top:0.75rem">
+      <div class="lb-card-title">Miten pisteet muodostuu</div>
+      <div style="display:grid;grid-template-columns:1fr 44px 44px 44px 44px 44px;padding:0.5rem 1rem 0.4rem;gap:2px;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em">Pelaaja</span>
+        <span style="${hdStyle};color:var(--green)">4p</span>
+        <span style="${hdStyle};color:var(--indigo)">3p</span>
+        <span style="${hdStyle};color:var(--amber)">2p</span>
+        <span style="${hdStyle};color:var(--text2)">1p</span>
+        <span style="${hdStyle};color:var(--text3)">0p</span>
+      </div>
+      ${breakdown.map(r => `
+        <div style="display:grid;grid-template-columns:1fr 44px 44px 44px 44px 44px;padding:6px 1rem;gap:2px;border-bottom:1px solid var(--border);${r.isMe?'background:var(--surface2)':''}">
+          <span style="font-size:13px;font-weight:${r.isMe?'600':'400'};color:var(--text)">${r.name}${r.isMe?' <span style="color:var(--indigo);font-size:11px">(sinä)</span>':''}</span>
+          ${cell(r.p4,4)}${cell(r.p3,3)}${cell(r.p2,2)}${cell(r.p1,1)}${cell(r.p0,0)}
+        </div>`).join('')}
+    </div>
+    <div class="lb-card" style="margin-top:0.75rem;padding:1rem">
+      <div class="lb-card-title">Pistekehitys</div>
+      <canvas id="lb-chart" height="220"></canvas>
     </div>`;
+
+  if (window.Chart) {
+    new window.Chart(document.getElementById('lb-chart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#7c889e', font: { size: 11 }, boxWidth: 12, boxHeight: 2, padding: 12, usePointStyle: true, pointStyle: 'line' } },
+          tooltip: { backgroundColor: '#131720', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, titleColor: '#e8eaf0', bodyColor: '#7c889e', padding: 10, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} p` } }
+        },
+        scales: {
+          x: { ticks: { color: '#3d4a60', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { beginAtZero: true, ticks: { color: '#3d4a60', font: { size: 11 }, stepSize: 4 }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  }
 }
 
 // ─── Muiden veikkaukset ───────────────────────────────────────────────────────
@@ -833,6 +1016,8 @@ window.app = {
       localStorage.removeItem(LOCKOUT_KEY);
     }
   },
+
+  toggleStakes(btn, matchId) { toggleStakes(btn, matchId); },
 
   scrollToMatch(matchId) {
     state.filter = 'all';
