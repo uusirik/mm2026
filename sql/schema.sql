@@ -39,12 +39,6 @@ create table if not exists public.bets (
   unique (user_id, match_id)
 );
 
--- ─── Lisää odds-sarakkeet jos taulut on jo olemassa ───────────────────────────
-alter table public.matches add column if not exists odds_home numeric;
-alter table public.matches add column if not exists odds_draw numeric;
-alter table public.matches add column if not exists odds_away numeric;
-alter table public.matches add column if not exists odds_updated_at timestamptz;
-
 -- ─── Pistetaulukko ────────────────────────────────────────────────────────────
 create or replace view public.leaderboard as
 select
