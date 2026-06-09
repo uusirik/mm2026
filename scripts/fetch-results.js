@@ -89,13 +89,6 @@ function toFi(espnName) {
   return EN_TO_FI[key] || EN_TO_FI[ALIASES[key]];
 }
 
-function mlToDecimal(ml) {
-  if (ml == null) return null;
-  const n = Number(ml);
-  if (isNaN(n) || n === 0) return null;
-  const dec = n > 0 ? n / 100 + 1 : 100 / Math.abs(n) + 1;
-  return Math.round(dec * 100) / 100;
-}
 
 function getRelevantDates() {
   const now = new Date();
@@ -144,7 +137,6 @@ async function main() {
   console.log(`ESPN: ${events.length} ottelua (${dates.join(', ')})`);
 
   let updatedResults = 0;
-  let updatedOdds    = 0;
 
   for (const event of events) {
     const comp = event.competitions?.[0];
@@ -164,25 +156,6 @@ async function main() {
     const sbM = sbIndex.get(`${homeFi}|${awayFi}`);
     if (!sbM) { console.warn(`  Ei vastaavuutta: ${homeFi} – ${awayFi}`); continue; }
 
-    // ESPN-kertoimet (DraftKings, tulee lähempänä ottelua)
-    if (!sbM.result) {
-      const oddsArr = comp.odds;
-      if (oddsArr?.length) {
-        const o = oddsArr[0];
-        const homeOdds = mlToDecimal(o.homeTeamOdds?.moneyLine);
-        const awayOdds = mlToDecimal(o.awayTeamOdds?.moneyLine);
-        const drawOdds = mlToDecimal(o.drawOdds?.moneyLine);
-        if (homeOdds || drawOdds || awayOdds) {
-          await patchMatch(sbM.id, {
-            odds_home: homeOdds, odds_draw: drawOdds, odds_away: awayOdds,
-            odds_updated_at: new Date().toISOString(),
-          });
-          console.log(`  Kertoimet ${homeFi}: 1:${homeOdds??'–'} X:${drawOdds??'–'} 2:${awayOdds??'–'}`);
-          updatedOdds++;
-        }
-      }
-    }
-
     // Tulos (vain kun ottelu on päättynyt)
     const completed = event.status?.type?.completed;
     if (!completed) continue;
@@ -198,7 +171,7 @@ async function main() {
     updatedResults++;
   }
 
-  console.log(`Valmis. Tuloksia päivitetty: ${updatedResults}, kertoimia: ${updatedOdds}`);
+  console.log(`Valmis. Tuloksia päivitetty: ${updatedResults}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
