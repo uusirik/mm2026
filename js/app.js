@@ -488,12 +488,6 @@ function renderBets(el) {
         <tr><td>Vain toisen joukkueen maalit oikein</td><td>1 p</td></tr>
         <tr><td>Ei osumia</td><td>0 p</td></tr>
       </table>
-      <div class="info-panel-sub">Jatkosarjassa:</div>
-      <table class="info-table">
-        <tr><td>Loppusijoitus täysin oikein</td><td>3 p</td></tr>
-        <tr><td>Veikkasi X, jatkoaika/pk:t ratkaisi</td><td>2 p</td></tr>
-        <tr><td>Joukkue oikeassa mitaliottelussa, väärä sijoitus</td><td>1 p</td></tr>
-      </table>
     </div>
     ${groupsHtml || '<div class="loading">Ei otteluita.</div>'}`;
 
