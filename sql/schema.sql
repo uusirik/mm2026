@@ -103,23 +103,26 @@ alter table public.bets     enable row level security;
 
 -- Profiilit
 drop policy if exists "Profiilit julkisesti luettavissa"  on public.profiles;
+drop policy if exists "Profiilit kirjautuneille"          on public.profiles;
 drop policy if exists "Käyttäjä muokkaa omaa profiiliaan" on public.profiles;
 drop policy if exists "Käyttäjä luo oman profiilinsa"     on public.profiles;
 
-create policy "Profiilit julkisesti luettavissa"  on public.profiles for select using (true);
+create policy "Profiilit kirjautuneille"          on public.profiles for select using (auth.uid() is not null);
 create policy "Käyttäjä muokkaa omaa profiiliaan" on public.profiles for update using (auth.uid() = id);
 create policy "Käyttäjä luo oman profiilinsa"     on public.profiles for insert with check (auth.uid() = id);
 
--- Ottelut (kaikki lukee, vain service_role kirjoittaa)
+-- Ottelut (kirjautuneet lukee, vain service_role kirjoittaa)
 drop policy if exists "Ottelut julkisesti luettavissa" on public.matches;
-create policy "Ottelut julkisesti luettavissa" on public.matches for select using (true);
+drop policy if exists "Ottelut kirjautuneille"         on public.matches;
+create policy "Ottelut kirjautuneille" on public.matches for select using (auth.uid() is not null);
 
 -- Veikkaukset
 drop policy if exists "Veikkaukset julkisesti luettavissa" on public.bets;
+drop policy if exists "Veikkaukset kirjautuneille"         on public.bets;
 drop policy if exists "Käyttäjä luo veikkauksen"           on public.bets;
 drop policy if exists "Käyttäjä muokkaa omaa veikkaustaan" on public.bets;
 
-create policy "Veikkaukset julkisesti luettavissa" on public.bets for select using (true);
+create policy "Veikkaukset kirjautuneille"         on public.bets for select using (auth.uid() is not null);
 create policy "Käyttäjä luo veikkauksen"           on public.bets for insert with check (auth.uid() = user_id);
 create policy "Käyttäjä muokkaa omaa veikkaustaan" on public.bets for update using (auth.uid() = user_id);
 
