@@ -108,21 +108,6 @@ mm2026-veikkaus/
 
 ---
 
-## Jatkosarjaotteluiden avaaminen
-
-Kun alkusarjan lohkot ovat valmiit ja otteluparit selviävät, aja Supabasessa:
-
-```sql
--- Esimerkki: R32_01 avautuu kun parit tiedossa
-UPDATE matches
-SET home = 'Espanja', away = 'Uruguay', tbd = false
-WHERE id = 'R32_01';
-```
-
-Ottelu avautuu veikattavaksi välittömästi kaikille käyttäjille.
-
----
-
 ## Tulosten manuaalinen syöttö
 
 Tulokset haetaan automaattisesti ESPN:stä. Jos tarvitaan manuaalinen korjaus:
