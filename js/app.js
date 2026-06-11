@@ -389,6 +389,20 @@ function renderNextMatchCard() {
           ? `<span class="nm-bet-done">✓ Veikattu ${bet.home_goals}–${bet.away_goals}</span>`
           : `<button class="nm-bet-btn" onclick="app.scrollToMatch('${m.id}')">Veikkaa →</button>`);
 
+    const eventsHtml = live && mData?.live_events?.length
+      ? `<div class="nm-events">${mData.live_events.map(e => {
+          const icons = { goal:'⚽', penalty:'⚽', owngoal:'🔴', yellow:'🟨', red:'🟥' };
+          const icon = icons[e.type] || '';
+          const isHome = e.team === 'home';
+          return `<div class="nm-event">
+            <span class="nm-event-home-name">${isHome ? e.player : ''}</span>
+            <span class="nm-event-spacer"></span>
+            <span class="nm-event-icon">${icon}</span>
+            <span class="nm-event-min">${e.min}'</span>
+            <span class="nm-event-away-name">${!isHome ? e.player : ''}</span>
+          </div>`;
+        }).join('')}</div>` : '';
+
     const stakesHtml = live ? `
       <button class="nm-stakes-toggle" onclick="app.toggleStakes(this,'${m.id}')">
         <span>Veikkaukset tällä tuloksella</span>
@@ -414,6 +428,7 @@ function renderNextMatchCard() {
           </div>
         </div>
         ${oddsHtml}
+        ${eventsHtml}
         <div class="nm-footer">
           <span class="nm-date">${fmtDate(kickoff)}</span>
           ${actionHtml}

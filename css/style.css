@@ -724,6 +724,21 @@ body {
 }
 .nm-elapsed.ht { color: var(--amber); background: var(--amber-bg); }
 
+.nm-events {
+  display: flex; flex-direction: column; gap: 3px;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem; margin-top: 0.4rem;
+}
+.nm-event {
+  display: grid; grid-template-columns: 1fr auto auto auto 1fr;
+  align-items: center; gap: 5px; font-size: 12px;
+}
+.nm-event-home-name { text-align: right; color: var(--text); font-weight: 500; }
+.nm-event-away-name { text-align: left;  color: var(--text); font-weight: 500; }
+.nm-event-icon      { font-size: 13px; }
+.nm-event-min       { font-size: 11px; color: var(--text3); min-width: 28px; text-align: center; }
+.nm-event-spacer    { }
+
 .nm-stakes-toggle {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; background: none;

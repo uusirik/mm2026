@@ -126,6 +126,27 @@ async function patchMatch(id, patch) {
   if (!res.ok) throw new Error(`Supabase-päivitysvirhe (${id}): ${res.status} ${await res.text()}`);
 }
 
+function parseLiveEvents(comp, homeTeamId) {
+  const details = comp.details || [];
+  const events = [];
+  for (const d of details) {
+    const typeText = (d.type?.text || '').toLowerCase();
+    let type = null;
+    if (typeText === 'goal')                          type = 'goal';
+    else if (typeText === 'own goal')                 type = 'owngoal';
+    else if (typeText === 'penalty goal')             type = 'penalty';
+    else if (typeText === 'yellow card')              type = 'yellow';
+    else if (typeText.includes('red'))                type = 'red';
+    if (!type) continue;
+    const player = d.athletesInvolved?.[0]?.displayName || '';
+    const clock  = d.clock?.displayValue || '';
+    const min    = clock.split(':')[0] || '';
+    const team   = d.team?.id === homeTeamId ? 'home' : 'away';
+    events.push({ type, min, player, team });
+  }
+  return events.sort((a, b) => parseInt(a.min || 0) - parseInt(b.min || 0));
+}
+
 async function main() {
   if (!SUPABASE_KEY) { console.error('SUPABASE_SERVICE_ROLE_KEY puuttuu'); process.exit(1); }
 
@@ -174,9 +195,10 @@ async function main() {
       const isHT = desc.includes('halftime') || desc.includes('half time');
       const liveClock = isHT ? 'HT' : (event.status?.displayClock || '');
       const livePeriod = event.status?.period || 1;
+      const liveEvents = parseLiveEvents(comp, homeComp.team?.id);
       if (sbM.home_goals === hg && sbM.away_goals === ag && sbM.live_clock === liveClock) continue;
-      console.log(`  ⚽ ${homeFi} ${hg}–${ag} ${awayFi} (${liveClock || livePeriod + '. jakso'})`);
-      await patchMatch(sbM.id, { home_goals: hg, away_goals: ag, live_clock: liveClock, live_period: livePeriod });
+      console.log(`  ⚽ ${homeFi} ${hg}–${ag} ${awayFi} (${liveClock || livePeriod + '. jakso'}, ${liveEvents.length} tapahtumaa)`);
+      await patchMatch(sbM.id, { home_goals: hg, away_goals: ag, live_clock: liveClock, live_period: livePeriod, live_events: liveEvents.length ? liveEvents : null });
     }
   }
 

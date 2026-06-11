@@ -26,7 +26,8 @@ create table if not exists public.matches (
   odds_away numeric,
   odds_updated_at timestamptz,
   live_clock text,
-  live_period integer
+  live_period integer,
+  live_events jsonb
 );
 
 create table if not exists public.bets (
