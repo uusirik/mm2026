@@ -170,9 +170,13 @@ async function main() {
       await patchMatch(sbM.id, { result, home_goals: hg, away_goals: ag });
       updatedResults++;
     } else {
-      if (sbM.home_goals === hg && sbM.away_goals === ag) continue;
-      console.log(`  ⚽ ${homeFi} ${hg}–${ag} ${awayFi} (käynnissä)`);
-      await patchMatch(sbM.id, { home_goals: hg, away_goals: ag });
+      const desc = (event.status?.type?.description || '').toLowerCase();
+      const isHT = desc.includes('halftime') || desc.includes('half time');
+      const liveClock = isHT ? 'HT' : (event.status?.displayClock || '');
+      const livePeriod = event.status?.period || 1;
+      if (sbM.home_goals === hg && sbM.away_goals === ag && sbM.live_clock === liveClock) continue;
+      console.log(`  ⚽ ${homeFi} ${hg}–${ag} ${awayFi} (${liveClock || livePeriod + '. jakso'})`);
+      await patchMatch(sbM.id, { home_goals: hg, away_goals: ag, live_clock: liveClock, live_period: livePeriod });
     }
   }
 

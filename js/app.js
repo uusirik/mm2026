@@ -362,10 +362,11 @@ function renderNextMatchCard() {
     const locked  = isLocked(m);
     const live    = locked && !mData?.result;
 
+    const liveClock = mData?.live_clock;
     const centerHtml = live
       ? `<div class="nm-live-score">
            <div class="nm-score">${mData?.home_goals ?? 0} – ${mData?.away_goals ?? 0}</div>
-           <div class="nm-elapsed" data-kickoff="${kickoff}">–</div>
+           <div class="nm-elapsed${liveClock === 'HT' ? ' ht' : ''}"${liveClock ? '' : ` data-kickoff="${kickoff}"`}>${liveClock || '–'}</div>
          </div>`
       : `<div class="nm-vs">VS</div>
          <div class="nm-countdown" data-kickoff="${kickoff}">–</div>`;

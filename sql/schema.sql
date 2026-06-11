@@ -24,7 +24,9 @@ create table if not exists public.matches (
   odds_home numeric,
   odds_draw numeric,
   odds_away numeric,
-  odds_updated_at timestamptz
+  odds_updated_at timestamptz,
+  live_clock text,
+  live_period integer
 );
 
 create table if not exists public.bets (
