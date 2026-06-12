@@ -147,8 +147,24 @@ function parseLiveEvents(comp, homeTeamId) {
   return events.sort((a, b) => parseInt(a.min || 0) - parseInt(b.min || 0));
 }
 
+async function hasActiveMatches() {
+  const twoHoursAgo = new Date(Date.now() - 2 * 36e5).toISOString();
+  const inFive      = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/matches?kickoff=gte.${twoHoursAgo}&kickoff=lte.${inFive}&result=is.null&tbd=is.false&select=id&limit=1`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+  );
+  const data = await res.json();
+  return Array.isArray(data) && data.length > 0;
+}
+
 async function main() {
   if (!SUPABASE_KEY) { console.error('SUPABASE_SERVICE_ROLE_KEY puuttuu'); process.exit(1); }
+
+  if (!await hasActiveMatches()) {
+    console.log('Ei käynnissä olevia tai alkavia otteluita — ohitetaan.');
+    process.exit(0);
+  }
 
   const sbMatches = await fetchSupabaseMatches();
   const sbIndex = new Map(sbMatches.map(m => [`${m.home}|${m.away}`, m]));
