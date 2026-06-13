@@ -134,7 +134,7 @@ function parseLiveEvents(comp, homeTeamId) {
     let type = null;
     if (typeText === 'goal')                          type = 'goal';
     else if (typeText === 'own goal')                 type = 'owngoal';
-    else if (typeText === 'penalty goal')             type = 'penalty';
+    else if (typeText.includes('penalty'))            type = 'penalty';
     else if (typeText === 'yellow card')              type = 'yellow';
     else if (typeText.includes('red'))                type = 'red';
     if (!type) continue;
