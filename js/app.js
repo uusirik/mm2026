@@ -338,7 +338,7 @@ const GROUP_ORDER = {
 function getNextMatches() {
   const list = state.matches.length ? state.matches : MATCHES;
   const upcoming = list
-    .filter(m => !m.result && !m.tbd && new Date(m.kickoff || m.dt) > Date.now() - 2 * 36e5)
+    .filter(m => !m.result && !m.tbd && new Date(m.kickoff || m.dt) > Date.now() - 3 * 36e5)
     .sort((a, b) => new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt));
   if (!upcoming.length) return [];
   const firstKickoff = new Date(upcoming[0].kickoff || upcoming[0].dt).getTime();

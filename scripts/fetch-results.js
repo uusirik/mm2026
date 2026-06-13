@@ -148,7 +148,7 @@ function parseLiveEvents(comp, homeTeamId) {
 }
 
 async function hasActiveMatches() {
-  const twoHoursAgo = new Date(Date.now() - 2 * 36e5).toISOString();
+  const twoHoursAgo = new Date(Date.now() - 3 * 36e5).toISOString();
   const inFive      = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/matches?kickoff=gte.${twoHoursAgo}&kickoff=lte.${inFive}&result=is.null&tbd=is.false&select=id&limit=1`,
