@@ -56,11 +56,7 @@ select
         and m.extra_time = false
       then 4
       when b.prediction = m.result
-        and (
-          (b.prediction = '1' and b.away_goals = m.away_goals) or
-          (b.prediction = '2' and b.home_goals = m.home_goals) or
-          (b.prediction = 'x' and (b.home_goals = m.home_goals or b.away_goals = m.away_goals))
-        )
+        and (b.home_goals = m.home_goals or b.away_goals = m.away_goals)
         and not (b.home_goals = m.home_goals and b.away_goals = m.away_goals)
         and m.extra_time = false
       then 3

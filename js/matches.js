@@ -151,12 +151,7 @@ export function calcPoints(bet, match) {
       return { points: 4, label: 'Täysin oikein' };
 
     if (correctResult) {
-      // Toisen joukkueen maalit oikein?
-      const otherGoalCorrect =
-        (match.result === '1' && correctAway) ||
-        (match.result === '2' && correctHome) ||
-        (match.result === 'x' && (correctHome || correctAway));
-      if (otherGoalCorrect)
+      if (correctHome || correctAway)
         return { points: 3, label: 'Voittaja + toisen maalit' };
       return { points: 2, label: 'Vain voittaja' };
     }
