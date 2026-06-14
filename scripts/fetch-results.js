@@ -70,10 +70,11 @@ const ALIASES = {
   'bosnia':                       'bosnia',
   'bosniaandherzegovina':         'bosnia',
   'bosniaherzegovina':            'bosnia',
+  'turkiye':                      'turkey',
 };
 
 function normalize(s) {
-  return (s || '').toLowerCase().replace(/[^a-z]/g, '');
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
 }
 
 const EN_TO_FI = {};
