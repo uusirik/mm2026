@@ -1157,6 +1157,7 @@ async function init() {
       state.bets = {};
     }
     renderAll();
+    if (state.user) showKoBanner();
   });
 
   // Päivitä lock-tilanne 60s välein
