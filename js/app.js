@@ -1090,6 +1090,8 @@ window.app = {
   async signOut() {
     await signOut();
   },
+
+  dismissKoBanner,
 };
 
 function updateStats() {
@@ -1113,6 +1115,21 @@ function toast(msg, isError = false) {
   setTimeout(() => t.classList.remove('show'), 2800);
 }
 
+// ─── Kertaluenteinen jatkopelimuistutus ───────────────────────────────────────
+const KO_BANNER_KEY = 'mm26_ko_banner_v1';
+
+function showKoBanner() {
+  if (localStorage.getItem(KO_BANNER_KEY)) return;
+  const el = document.getElementById('ko-banner');
+  if (el) el.style.display = 'flex';
+}
+
+function dismissKoBanner() {
+  localStorage.setItem(KO_BANNER_KEY, '1');
+  const el = document.getElementById('ko-banner');
+  if (el) el.style.display = 'none';
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   // Tarkista sessio ensin — estää login-sivun välähtämisen F5:llä
@@ -1124,6 +1141,7 @@ async function init() {
     await Promise.all([loadMatches(), loadBets()]);
   }
   renderAll();
+  if (state.user) showKoBanner();
 
   // Kuuntele myöhempiä auth-muutoksia (kirjautuminen, uloskirjautuminen)
   sb.auth.onAuthStateChange(async (event, session) => {

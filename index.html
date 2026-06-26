@@ -10,7 +10,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css" />
-  <link rel="stylesheet" href="css/style.css?v=26" />
+  <link rel="stylesheet" href="css/style.css?v=27" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -27,6 +27,13 @@
       <div id="topbar-user"></div>
     </div>
   </header>
+
+  <!-- Kertaluenteinen muistutus jatkopeleistä -->
+  <div id="ko-banner" class="ko-banner" style="display:none">
+    <span class="ko-banner-icon">🏆</span>
+    <span class="ko-banner-text">Ensimmäiset jatkopeliparit on nyt selvillä! Muista veikkata ennen otteluiden alkua.</span>
+    <button class="ko-banner-close" onclick="app.dismissKoBanner()" aria-label="Sulje">✕</button>
+  </div>
 
   <!-- Pääsisältö -->
   <div id="app-root">
@@ -45,7 +52,7 @@
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
 <!-- Sovellus ES-moduulina -->
-<script type="module" src="js/app.js?v=26"></script>
+<script type="module" src="js/app.js?v=27"></script>
 
 </body>
 </html>
