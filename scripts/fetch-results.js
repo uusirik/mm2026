@@ -164,10 +164,10 @@ async function updateKnockoutMatches(tbdMatches, events, sbIndex) {
 
     const espnTime = new Date(event.date).getTime();
 
-    // Etsi TBD-paikka jonka kickoff on lähimpänä (toleranssi 4h)
+    // Etsi TBD-paikka jonka kickoff on lähimpänä (toleranssi 12h)
     const slot = tbdMatches.find(m =>
       m.home === 'TBD' &&
-      Math.abs(new Date(m.kickoff).getTime() - espnTime) < 4 * 36e5
+      Math.abs(new Date(m.kickoff).getTime() - espnTime) < 12 * 36e5
     );
     if (!slot) continue;
 
