@@ -377,6 +377,16 @@ body {
   padding-left: 8px;
 }
 
+.knockout-note {
+  font-size: 0.78rem;
+  color: var(--text3);
+  background: color-mix(in srgb, var(--indigo) 8%, transparent);
+  border-left: 3px solid var(--indigo);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
 /* ── TBD-ottelu ─────────────────────────────────────────────────────────────── */
 .tbd-match {
   opacity: 0.5;

@@ -136,6 +136,24 @@ async function patchMatch(id, patch) {
   if (!res.ok) throw new Error(`Supabase-päivitysvirhe (${id}): ${res.status} ${await res.text()}`);
 }
 
+// Laskee varsinaisen peliajan (jaksot 1-2) maalimäärän detail-tapahtumista.
+// Käytetään kun ottelu on mennyt jatkoajalle/rankkareille (period >= 3).
+function regularTimeScore(comp, homeTeamId) {
+  let hg = 0, ag = 0;
+  for (const d of (comp.details || [])) {
+    const typeText = (d.type?.text || '').toLowerCase();
+    const isGoal = typeText.startsWith('goal') || typeText === 'own goal' || typeText.includes('penalty');
+    if (!isGoal) continue;
+    const period = d.period?.number || 1;
+    if (period >= 3) continue;
+    const isHome = d.team?.id === homeTeamId;
+    const isOwn  = typeText === 'own goal';
+    if (isOwn) { if (isHome) ag++; else hg++; }
+    else       { if (isHome) hg++; else ag++; }
+  }
+  return { hg, ag };
+}
+
 function parseLiveEvents(comp, homeTeamId) {
   const details = comp.details || [];
   const events = [];
@@ -318,9 +336,15 @@ async function main() {
     const ag = parseInt(awayComp.score) || 0;
 
     if (completed) {
+      const statusPeriod = event.status?.period || 1;
+      if (statusPeriod >= 3) {
+        // Jatkoaika tai rankkarit — lasketaan maalit varsinaisesta peliajasta (jaksot 1-2)
+        const rt = regularTimeScore(comp, homeComp.team?.id);
+        hg = rt.hg; ag = rt.ag;
+      }
       if (sbM.result !== null && sbM.home_goals === hg && sbM.away_goals === ag) continue;
       const result = hg > ag ? '1' : ag > hg ? '2' : 'x';
-      console.log(`  ✓ ${homeFi} ${hg}–${ag} ${awayFi} → ${result}`);
+      console.log(`  ✓ ${homeFi} ${hg}–${ag} ${awayFi} → ${result}${statusPeriod >= 3 ? ' (varsinainen peliaika)' : ''}`);
       await patchMatch(sbM.id, { result, home_goals: hg, away_goals: ag, live_clock: null, live_period: null, live_events: null });
       updatedResults++;
     } else {

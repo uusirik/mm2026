@@ -524,13 +524,18 @@ function renderBets(el) {
     groups[g].push(m);
   });
 
+  let koNoteShown = false;
   const groupsHtml = Object.entries(groups)
     .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
     .map(([g, ms]) => {
       const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
       const isKnockout = !!GROUP_LABELS[g];
       const rows = ms.map(m => renderMatchCard(m)).join('');
-      return `<div class="group-block"><div class="group-label ${isKnockout?'knockout-label':''}">${label}</div>${rows}</div>`;
+      const note = (isKnockout && !koNoteShown)
+        ? `<div class="knockout-note">Jatkopeleissä veikkaus perustuu varsinaisen peliajan (90 min) tulokseen — jatkoaika ja rangaistuspotkut jätetään huomiotta.</div>`
+        : '';
+      if (isKnockout) koNoteShown = true;
+      return `${note}<div class="group-block"><div class="group-label ${isKnockout?'knockout-label':''}">${label}</div>${rows}</div>`;
     }).join('');
 
   el.innerHTML = `
