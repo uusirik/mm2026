@@ -1116,7 +1116,7 @@ function toast(msg, isError = false) {
 }
 
 // ─── Kertaluenteinen jatkopelimuistutus ───────────────────────────────────────
-const KO_BANNER_KEY = 'mm26_ko_banner_v1';
+const KO_BANNER_KEY = 'mm26_ko_banner_v2';
 
 function showKoBanner() {
   if (localStorage.getItem(KO_BANNER_KEY)) return;
