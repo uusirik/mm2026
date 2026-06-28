@@ -108,6 +108,20 @@ async function fetchSupabaseMatches() {
   return res.json();
 }
 
+async function insertMatch(id, groupName, home, away, kickoff) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/matches`, {
+    method: 'POST',
+    headers: {
+      apikey:         SUPABASE_KEY,
+      Authorization:  `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer:         'return=minimal',
+    },
+    body: JSON.stringify({ id, group_name: groupName, home, away, kickoff, tbd: false }),
+  });
+  if (!res.ok) throw new Error(`Supabase-inserttivirhe (${id}): ${res.status} ${await res.text()}`);
+}
+
 async function patchMatch(id, patch) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/matches?id=eq.${id}`, {
     method:  'PATCH',
@@ -143,11 +157,30 @@ function parseLiveEvents(comp, homeTeamId) {
   return events.sort((a, b) => parseInt(a.min || 0) - parseInt(b.min || 0));
 }
 
-// Täyttää TBD-jatkopelipaikat kun ESPN tietää joukkueet.
-// Matchataan ESPN-tapahtuma TBD-paikkaan kickoff-ajan perusteella (±4h toleranssi).
-async function updateKnockoutMatches(tbdMatches, events, sbIndex) {
+// Määrittää jatkopelieron kierroksen ESPN-tapahtuman päivämäärän perusteella
+function knockoutRound(dateStr) {
+  const t = new Date(dateStr).getTime();
+  const d = (y, m, day) => Date.UTC(y, m - 1, day);
+  if (t >= d(2026,6,29) && t < d(2026,7,5))  return 'R32';
+  if (t >= d(2026,7,6)  && t < d(2026,7,10)) return 'R16';
+  if (t >= d(2026,7,11) && t < d(2026,7,13)) return 'QF';
+  if (t >= d(2026,7,15) && t < d(2026,7,17)) return 'SF';
+  if (t >= d(2026,7,18) && t < d(2026,7,19)) return '3P';
+  if (t >= d(2026,7,19))                      return 'FIN';
+  return null;
+}
+
+// Täyttää TBD-jatkopelipaikat ESPN:stä.
+// - Matchataan lähimpään TBD-paikkaan (±48h) ja päivitetään kickoff oikeaksi
+// - Jos sopivaa paikkaa ei löydy, luodaan uusi rivi automaattisesti
+async function updateKnockoutMatches(tbdMatches, events, sbIndex, sbMatches) {
+  const slots = tbdMatches
+    .filter(m => m.home === 'TBD')
+    .sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+
   let updated = 0;
-  for (const event of events) {
+
+  for (const event of events.sort((a, b) => new Date(a.date) - new Date(b.date))) {
     const comp = event.competitions?.[0];
     if (!comp) continue;
 
@@ -159,26 +192,39 @@ async function updateKnockoutMatches(tbdMatches, events, sbIndex) {
     const awayFi = toFi(awayComp.team?.displayName);
     if (!homeFi || !awayFi) continue;
 
-    // Löytyy jo tunnettuna otteluna → ei jatkopelipaikka
     if (sbIndex.has(`${homeFi}|${awayFi}`)) continue;
 
     const espnTime = new Date(event.date).getTime();
+    const round = knockoutRound(event.date);
+    if (!round) continue;
 
-    // Etsi TBD-paikka jonka kickoff on lähimpänä (toleranssi 12h)
-    const slot = tbdMatches.find(m =>
-      m.home === 'TBD' &&
-      Math.abs(new Date(m.kickoff).getTime() - espnTime) < 12 * 36e5
+    const slotIdx = slots.findIndex(m =>
+      Math.abs(new Date(m.kickoff).getTime() - espnTime) < 48 * 36e5
     );
-    if (!slot) continue;
 
-    console.log(`  📋 ${slot.id}: TBD → ${homeFi} – ${awayFi}`);
-    await patchMatch(slot.id, { home: homeFi, away: awayFi, tbd: false });
-    slot.home = homeFi;
-    slot.away = awayFi;
-    slot.tbd = false;
-    sbIndex.set(`${homeFi}|${awayFi}`, slot);
+    if (slotIdx !== -1) {
+      const slot = slots[slotIdx];
+      // Päivitä joukkueet + oikea kickoff ESPN:stä
+      console.log(`  📋 ${slot.id}: TBD → ${homeFi} – ${awayFi} (${event.date})`);
+      await patchMatch(slot.id, { home: homeFi, away: awayFi, tbd: false, kickoff: event.date });
+      slot.home = homeFi;
+      slot.away = awayFi;
+      slot.tbd = false;
+      sbIndex.set(`${homeFi}|${awayFi}`, slot);
+      slots.splice(slotIdx, 1);
+    } else {
+      // Ei sopivaa paikkaa → luo uusi rivi
+      const existing = sbMatches.filter(m => m.group_name === round).length;
+      const newId = `${round}_${String(existing + 1).padStart(2, '0')}`;
+      console.log(`  ➕ Uusi rivi ${newId}: ${homeFi} – ${awayFi} (${event.date})`);
+      await insertMatch(newId, round, homeFi, awayFi, event.date);
+      const newMatch = { id: newId, home: homeFi, away: awayFi, group_name: round, kickoff: event.date, tbd: false };
+      sbIndex.set(`${homeFi}|${awayFi}`, newMatch);
+      sbMatches.push(newMatch);
+    }
     updated++;
   }
+
   if (updated) console.log(`Jatkopeliparit päivitetty: ${updated}`);
 }
 
@@ -195,21 +241,22 @@ async function main() {
     new Date(m.kickoff).getTime() <= now + 5 * 60 * 1000
   );
 
-  // TBD-paikat joiden kickoff on seuraavan 14 päivän sisällä
-  const tbdMatches = sbMatches.filter(m =>
-    m.tbd && new Date(m.kickoff).getTime() < now + 14 * 864e5
-  );
+  // Kaikki täyttämättömät TBD-paikat
+  const tbdMatches = sbMatches.filter(m => m.tbd);
 
   if (!activeMatches.length && !tbdMatches.length) {
     console.log('Ei käynnissä olevia otteluita tai täytettäviä jatkopelipareja — ohitetaan.');
     process.exit(0);
   }
 
-  // Haetaan ESPN:stä: perusjaksolta + TBD-otteluiden päiviltä
+  // Haetaan ESPN:stä: perusjaksolta + ±1 päivä TBD-kickoffeista (aikavyöhyke-epävarmuus)
   const standardDates = [-1, 0, 1, 2, 3, 4, 5].map(i =>
     toDateStr(new Date(now + i * 864e5))
   );
-  const tbdDates = tbdMatches.map(m => toDateStr(new Date(m.kickoff)));
+  const tbdDates = tbdMatches.flatMap(m => {
+    const t = new Date(m.kickoff).getTime();
+    return [-1, 0, 1].map(i => toDateStr(new Date(t + i * 864e5)));
+  });
   const allDates = [...new Set([...standardDates, ...tbdDates])];
 
   const events = (await Promise.all(allDates.map(fetchEspn))).flat();
@@ -222,7 +269,7 @@ async function main() {
 
   // Vaihe 1: Täytä TBD-jatkopelipaikat
   if (tbdMatches.length) {
-    await updateKnockoutMatches(tbdMatches, events, sbIndex);
+    await updateKnockoutMatches(tbdMatches, events, sbIndex, sbMatches);
   }
 
   // Vaihe 2: Päivitä käynnissä olevien ja päättyneiden otteluiden tulokset
