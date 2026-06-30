@@ -332,8 +332,8 @@ async function main() {
     const inProgress = event.status?.type?.state === 'in';
     if (!completed && !inProgress) continue;
 
-    const hg = parseInt(homeComp.score) || 0;
-    const ag = parseInt(awayComp.score) || 0;
+    let hg = parseInt(homeComp.score) || 0;
+    let ag = parseInt(awayComp.score) || 0;
 
     if (completed) {
       const statusPeriod = event.status?.period || 1;
