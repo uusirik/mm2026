@@ -179,13 +179,13 @@ const KNOCKOUT_ROUNDS = ['R32','R16','QF','SF','3P','FIN'];
 
 function knockoutRound(dateStr) {
   const t = new Date(dateStr).getTime();
-  const d = (y, m, day) => Date.UTC(y, m - 1, day);
-  if (t >= d(2026,6,29) && t < d(2026,7,5))  return 'R32';
-  if (t >= d(2026,7,6)  && t < d(2026,7,10)) return 'R16';
-  if (t >= d(2026,7,11) && t < d(2026,7,13)) return 'QF';
-  if (t >= d(2026,7,15) && t < d(2026,7,17)) return 'SF';
-  if (t >= d(2026,7,18) && t < d(2026,7,19)) return '3P';
-  if (t >= d(2026,7,19))                      return 'FIN';
+  const d = (y, m, day, h = 0) => Date.UTC(y, m - 1, day, h);
+  if (t >= d(2026,6,29)     && t < d(2026,7,4,12))  return 'R32';
+  if (t >= d(2026,7,4,12)   && t < d(2026,7,10))    return 'R16';
+  if (t >= d(2026,7,11)     && t < d(2026,7,13))    return 'QF';
+  if (t >= d(2026,7,15)     && t < d(2026,7,17))    return 'SF';
+  if (t >= d(2026,7,18)     && t < d(2026,7,19))    return '3P';
+  if (t >= d(2026,7,19))                             return 'FIN';
   return null;
 }
 
@@ -230,6 +230,15 @@ async function updateKnockoutMatches(events, sbIndex, sbMatches) {
       continue;
     }
 
+    // Duplikaattitarkistus: varmista ettei kumpikaan joukkue ole jo mukana kierroksella
+    const roundMatches = sbMatches.filter(m => m.group_name === round && !m.tbd);
+    const homeAlreadyPlaying = roundMatches.some(m => m.home === homeFi || m.away === homeFi);
+    const awayAlreadyPlaying = roundMatches.some(m => m.home === awayFi || m.away === awayFi);
+    if (homeAlreadyPlaying || awayAlreadyPlaying) {
+      console.warn(`  ⚠️ Ohitetaan duplikaatti: ${homeFi}–${awayFi} (joukkue jo ${round}-kierroksella)`);
+      continue;
+    }
+
     // Uusi jatkopelipari — etsi vapaa TBD-paikka samalta kierrokselta tai luo uusi
     const tbdSlot = sbMatches.find(m =>
       m.group_name === round && m.tbd && m.home === 'TBD'
@@ -240,8 +249,10 @@ async function updateKnockoutMatches(events, sbIndex, sbMatches) {
       await patchMatch(tbdSlot.id, { home: homeFi, away: awayFi, tbd: false, kickoff: event.date });
       tbdSlot.home = homeFi; tbdSlot.away = awayFi; tbdSlot.tbd = false;
     } else {
-      const roundCount = sbMatches.filter(m => m.group_name === round).length;
-      const newId = `${round}_${String(roundCount + 1).padStart(2, '0')}`;
+      const usedIds = new Set(sbMatches.filter(m => m.group_name === round).map(m => m.id));
+      let num = 1;
+      while (usedIds.has(`${round}_${String(num).padStart(2, '0')}`)) num++;
+      const newId = `${round}_${String(num).padStart(2, '0')}`;
       console.log(`  ➕ Uusi ${newId}: ${homeFi} – ${awayFi} (${event.date})`);
       await insertMatch(newId, round, homeFi, awayFi, event.date);
       const newMatch = { id: newId, home: homeFi, away: awayFi, group_name: round, kickoff: event.date, tbd: false };
