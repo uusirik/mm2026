@@ -183,7 +183,7 @@ function knockoutRound(dateStr) {
   if (t >= d(2026,6,29)     && t < d(2026,7,4,12))  return 'R32';
   if (t >= d(2026,7,4,12)   && t < d(2026,7,10))    return 'R16';
   if (t >= d(2026,7,11)     && t < d(2026,7,13))    return 'QF';
-  if (t >= d(2026,7,15)     && t < d(2026,7,17))    return 'SF';
+  if (t >= d(2026,7,14)     && t < d(2026,7,17))    return 'SF';
   if (t >= d(2026,7,18)     && t < d(2026,7,19))    return '3P';
   if (t >= d(2026,7,19))                             return 'FIN';
   return null;
