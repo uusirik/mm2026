@@ -144,8 +144,8 @@ function regularTimeScore(comp, homeTeamId) {
     const typeText = (d.type?.text || '').toLowerCase();
     const isGoal = typeText.startsWith('goal') || typeText === 'own goal' || typeText.includes('penalty');
     if (!isGoal) continue;
-    const period = d.period?.number || 1;
-    if (period >= 3) continue;
+    const period = d.period?.number;
+    if (!period || period >= 3) continue;
     const isHome = d.team?.id === homeTeamId;
     const isOwn  = typeText === 'own goal';
     if (isOwn) { if (isHome) ag++; else hg++; }
