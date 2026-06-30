@@ -144,8 +144,9 @@ function regularTimeScore(comp, homeTeamId) {
     const typeText = (d.type?.text || '').toLowerCase();
     const isGoal = typeText.startsWith('goal') || typeText === 'own goal' || typeText.includes('penalty');
     if (!isGoal) continue;
-    const period = d.period?.number;
-    if (!period || period >= 3) continue;
+    // "90+5:00" → parseInt = 90, jatkoajan "105:00" → 105, rankkarit ilman kelloa → NaN
+    const min = parseInt((d.clock?.displayValue || '').split(':')[0]);
+    if (isNaN(min) || min > 90) continue;
     const isHome = d.team?.id === homeTeamId;
     const isOwn  = typeText === 'own goal';
     if (isOwn) { if (isHome) ag++; else hg++; }
