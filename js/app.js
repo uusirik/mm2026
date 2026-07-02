@@ -12,6 +12,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 let state = {
   view: 'bets',
   filter: 'all',
+  sortMode: 'group',  // 'group' | 'time'
+  sortDir: 'asc',     // 'asc' | 'desc'
   user: null,
   profile: null,
   bets: {},
@@ -505,26 +507,34 @@ function renderBets(el) {
   if (state.filter === 'bet')    filtered = matchList.filter(m =>  state.bets[m.id]);
   if (state.filter === 'unbet')  filtered = matchList.filter(m => !isLocked(m) && !state.bets[m.id] && !m.tbd);
 
-  const groups = {};
-  filtered.forEach(m => {
-    const g = m.group_name || m.g;
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(m);
-  });
-
-  let koNoteShown = false;
-  const groupsHtml = Object.entries(groups)
-    .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
-    .map(([g, ms]) => {
-      const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
-      const isKnockout = !!GROUP_LABELS[g];
-      const rows = ms.map(m => renderMatchCard(m)).join('');
-      const note = (isKnockout && !koNoteShown)
-        ? `<div class="knockout-note">Jatkopeleissä veikkaus perustuu varsinaisen peliajan (90 min) tulokseen — jatkoaika ja rangaistuspotkut jätetään huomiotta.</div>`
-        : '';
-      if (isKnockout) koNoteShown = true;
-      return `${note}<div class="group-block"><div class="group-label ${isKnockout?'knockout-label':''}">${label}</div>${rows}</div>`;
-    }).join('');
+  let groupsHtml = '';
+  if (state.sortMode === 'time') {
+    const sorted = [...filtered].filter(m => !m.tbd).sort((a, b) => {
+      const diff = new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt);
+      return state.sortDir === 'asc' ? diff : -diff;
+    });
+    groupsHtml = sorted.map(m => renderMatchCard(m)).join('');
+  } else {
+    const groups = {};
+    filtered.forEach(m => {
+      const g = m.group_name || m.g;
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(m);
+    });
+    let koNoteShown = false;
+    groupsHtml = Object.entries(groups)
+      .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
+      .map(([g, ms]) => {
+        const label = GROUP_LABELS[g] ?? `Lohko ${g}`;
+        const isKnockout = !!GROUP_LABELS[g];
+        const rows = ms.map(m => renderMatchCard(m)).join('');
+        const note = (isKnockout && !koNoteShown)
+          ? `<div class="knockout-note">Jatkopeleissä veikkaus perustuu varsinaisen peliajan (90 min) tulokseen — jatkoaika ja rangaistuspotkut jätetään huomiotta.</div>`
+          : '';
+        if (isKnockout) koNoteShown = true;
+        return `${note}<div class="group-block"><div class="group-label ${isKnockout?'knockout-label':''}">${label}</div>${rows}</div>`;
+      }).join('');
+  }
 
   el.innerHTML = `
     ${renderNextMatchCard()}
@@ -544,6 +554,13 @@ function renderBets(el) {
       <button class="filter-btn ${state.filter==='bet'?'active':''}"    onclick="app.setFilter('bet')">Veikatut</button>
       <span class="filter-count">${filtered.length} ottelua</span>
       <button class="info-btn" onclick="app.toggleInfo()" title="Pisteytyssäännöt">?</button>
+    </div>
+    <div class="sort-bar">
+      <div class="sort-toggle">
+        <button class="sort-mode-btn ${state.sortMode==='group'?'active':''}" onclick="app.setSortMode('group')">Lohkot</button>
+        <button class="sort-mode-btn ${state.sortMode==='time'?'active':''}"  onclick="app.setSortMode('time')">Aika</button>
+      </div>
+      ${state.sortMode === 'time' ? `<button class="sort-dir-btn" onclick="app.toggleSortDir()">${state.sortDir === 'asc' ? '↑ Vanhimmat ensin' : '↓ Uusimmat ensin'}</button>` : ''}
     </div>
     <div class="info-panel" id="info-panel" style="display:none">
       <div class="info-panel-title">Pisteytys</div>
@@ -958,7 +975,48 @@ async function renderOthers(el) {
 
   const groupsHtml = (() => {
     const groups = {};
-    matchList.filter(m => isLocked(m) && !m.tbd).forEach(m => {
+    const sortedMatchList = state.sortMode === 'time'
+      ? [...matchList].filter(m => isLocked(m) && !m.tbd).sort((a, b) => {
+          const diff = new Date(a.kickoff || a.dt) - new Date(b.kickoff || b.dt);
+          return state.sortDir === 'asc' ? diff : -diff;
+        })
+      : matchList.filter(m => isLocked(m) && !m.tbd);
+
+    if (state.sortMode === 'time') {
+      return sortedMatchList.length
+        ? sortedMatchList.map(m => {
+            const mData = getMatchData(m.id);
+            const chips = Object.entries(byUser).map(([userId, u]) => {
+              const b = u.bets[m.id];
+              if (!b) return '';
+              const cls = { '1': 'r1', 'x': 'rx', '2': 'r2' }[b.prediction];
+              const isMe = userId === state.user?.id;
+              const ptsObj = mData?.result ? calcPoints(b, mData) : null;
+              const ptsCls = ptsObj
+                ? ptsObj.points >= 4 ? 'other-chip-pts pts-4'
+                : ptsObj.points >= 3 ? 'other-chip-pts pts-3'
+                : ptsObj.points >= 2 ? 'other-chip-pts pts-2'
+                : ptsObj.points >= 1 ? 'other-chip-pts pts-1'
+                : 'other-chip-pts pts-0'
+                : '';
+              const ptsHtml = ptsObj != null ? `<span class="${ptsCls}">${ptsObj.points}p</span>` : '';
+              return `<div class="other-chip">
+                <span class="other-chip-name">${isMe ? u.name : shortName(u.name)}</span>
+                <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>${ptsHtml}
+              </div>`;
+            }).filter(Boolean).join('');
+            if (!chips) return '';
+            const resultStr = mData?.result && mData.home_goals != null
+              ? ` <span class="others-result">${mData.home_goals}–${mData.away_goals}</span>` : '';
+            return `<div class="others-match">
+              <div class="others-match-title">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a}${resultStr} <span class="others-date">${fmtDate(m.dt||m.kickoff)}</span></div>
+              <div class="others-grid">${chips}</div>
+            </div>`;
+          }).filter(Boolean).join('')
+        : '<div class="loading">Ei vielä lukittuja otteluita.</div>';
+    }
+
+    sortedMatchList.forEach(m => {
       const g = m.group_name || m.g;
       if (!groups[g]) groups[g] = [];
       groups[g].push(m);
@@ -1010,7 +1068,17 @@ async function renderOthers(el) {
       }).join('');
   })();
 
-  el.innerHTML = `<div class="others-view">${groupsHtml}</div>`;
+  const dirArrow2 = state.sortDir === 'asc' ? '↑' : '↓';
+  el.innerHTML = `<div class="others-view">
+    <div class="sort-bar">
+      <div class="sort-toggle">
+        <button class="sort-mode-btn ${state.sortMode==='group'?'active':''}" onclick="app.setSortMode('group')">Lohkot</button>
+        <button class="sort-mode-btn ${state.sortMode==='time'?'active':''}"  onclick="app.setSortMode('time')">Aika</button>
+      </div>
+      ${state.sortMode === 'time' ? `<button class="sort-dir-btn" onclick="app.toggleSortDir()">${state.sortDir === 'asc' ? '↑ Vanhimmat ensin' : '↓ Uusimmat ensin'}</button>` : ''}
+    </div>
+    ${groupsHtml}
+  </div>`;
 }
 
 // ─── Toiminnot (globaalit, kutsutaan HTML:stä) ────────────────────────────────
@@ -1096,6 +1164,16 @@ window.app = {
   },
 
   dismissKoBanner,
+
+  setSortMode(mode) {
+    state.sortMode = mode;
+    renderView();
+  },
+
+  toggleSortDir() {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    renderView();
+  },
 };
 
 function updateStats() {
