@@ -626,7 +626,7 @@ body {
 .pts-3 { color: var(--indigo); }
 .pts-2 { color: var(--amber); }
 .pts-1 { color: var(--text2); }
-.pts-0 { display: none; }
+.pts-0 { color: var(--text3); }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────── */
 .toast {
@@ -959,6 +959,57 @@ body {
 
 .bnav-tab.active { color: var(--indigo); }
 .bnav-tab:not(.active):active { color: var(--text2); }
+
+
+/* ── Järjestyspalkki ─────────────────────────────────────────────────────────── */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.sort-toggle {
+  display: flex;
+  background: var(--surface2);
+  border-radius: 20px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.sort-mode-btn {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sort-mode-btn.active {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.sort-mode-btn:hover:not(.active) { color: var(--text); }
+
+.sort-dir-btn {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sort-dir-btn:hover { color: var(--text); border-color: var(--indigo); }
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
