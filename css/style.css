@@ -582,6 +582,18 @@ body {
 }
 .others-date { font-weight: 400; color: var(--text2); margin-left: 4px; }
 
+/* Lopputulos ottelun otsikossa */
+.others-result {
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 13px;
+  margin-left: 2px;
+}
+
 .others-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -597,10 +609,24 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 12px;
+  gap: 4px;
 }
 
-.other-chip-name { color: var(--text2); }
-.other-chip-bet { font-weight: 600; }
+.other-chip-name { color: var(--text2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.other-chip-bet { font-weight: 600; flex-shrink: 0; }
+
+/* Pisteet chipissä */
+.other-chip-pts {
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.pts-4 { color: var(--green); }
+.pts-3 { color: var(--indigo); }
+.pts-2 { color: var(--amber); }
+.pts-1 { color: var(--text2); }
+.pts-0 { display: none; }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────── */
 .toast {
