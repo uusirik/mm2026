@@ -3,7 +3,6 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { MATCHES, calcPoints, isLocked, fmtDate, matchResult } from './matches.js';
 
 // ─── Konfiguraatio ───────────────────────────────────────────────────────────
-// Vaihda nämä omilla Supabase-projektin arvoilla!
 const SUPABASE_URL  = 'https://hwomgxbxcyrrjcwgjgtj.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3b21neGJ4Y3lycmpjd2dqZ3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTEzNTgsImV4cCI6MjA5NjQ2NzM1OH0.oMMNWvwPcSbqXSSoVnBh1BwqFoPT_-rfra5A6pIrsgo';
 
@@ -11,19 +10,19 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ─── Sovelluksen tila ─────────────────────────────────────────────────────────
 let state = {
-  view: 'bets',       // 'bets' | 'leaderboard' | 'others' | 'news'
-  filter: 'all',      // 'all' | 'open' | 'locked' | 'bet' | 'unbet'
+  view: 'bets',
+  filter: 'all',
   user: null,
   profile: null,
-  bets: {},           // { match_id: { prediction, home_goals, away_goals } }
-  matches: [],        // Supabasesta haettu (sisältää result-kentän)
+  bets: {},
+  matches: [],
   leaderboard: [],
-  news: null,         // { items: [], fetchedAt: 0 }
+  news: null,
   saveQueue: {},
   saveTimers: {},
 };
 
-// ─── Joukkueiden liput (flagcdn.com kuvat — toimii kaikilla alustoilla) ───────
+// ─── Joukkueiden liput ────────────────────────────────────────────────────────
 const TEAM_CODES = {
   'Meksiko':'mx','Etelä-Afrikka':'za','Etelä-Korea':'kr','Tšekki':'cz',
   'Kanada':'ca','Bosnia & Hertsegovina':'ba','Qatar':'qa','Sveitsi':'ch',
@@ -102,7 +101,6 @@ function debounceSave(matchId) {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-// SHA-256 tiiviste kutsukoodeista — itse koodi on vain URL-fragmentissa (#...)
 const INVITE_HASHES = new Set([
   '8b345f1b0e4072637dcbc1c0bca1996dc5b955ad8ddcb9de04728ee5ceec0230',
 ]);
@@ -110,7 +108,7 @@ const INVITE_KEY = 'mm2026_invited';
 const LOCKOUT_KEY = 'mm2026_lockout';
 const ATTEMPTS_KEY = 'mm2026_attempts';
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 5 * 60 * 1000; // 5 minuuttia
+const LOCKOUT_MS = 5 * 60 * 1000;
 
 function shortName(full) {
   if (!full) return '?';
@@ -137,7 +135,6 @@ async function checkInvite() {
   return false;
 }
 
-// Muodostaa Supabase-emailin nimestä — käyttäjä ei koskaan näe tätä
 function nameToEmail(name) {
   const slug = name.toLowerCase()
     .replace(/ä/g,'a').replace(/ö/g,'o').replace(/å/g,'a')
@@ -145,7 +142,6 @@ function nameToEmail(name) {
   return `${slug}@afry2026.test`;
 }
 
-// Salasana = kiinteä prefix + PIN (ei riipu kutsulinkkistä)
 function makePassword(pin) {
   return `MM26vk-${pin}`;
 }
@@ -155,14 +151,11 @@ async function signInOrRegister(displayName, pin) {
   const email    = nameToEmail(displayName);
   const password = makePassword(pin);
 
-  // Yritetään kirjautua — onnistuu paluukerroilla millä laitteella tahansa
   const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
   if (!signInErr) return null;
 
-  // Kirjautuminen epäonnistui — jos ei kutsulinkkiä, kyse on väärästä PIN-koodista
   if (!invited) return new Error('Väärä nimi tai PIN-koodi');
 
-  // Kutsulinkkiä löytyy — yritetään rekisteröidä uutena käyttäjänä
   const { error: signUpErr } = await sb.auth.signUp({
     email,
     password,
@@ -176,7 +169,6 @@ async function signInOrRegister(displayName, pin) {
     return signUpErr;
   }
 
-  // Kirjaudu sisään heti rekisteröinnin jälkeen
   const { error: signInAfterErr } = await sb.auth.signInWithPassword({ email, password });
   return signInAfterErr ?? null;
 }
@@ -273,7 +265,6 @@ function renderTopbar() {
 }
 
 async function renderAuth(root) {
-  // Tallenna kutsukoodi URL-fragmentista jos se löytyy
   await checkInvite();
 
   root.innerHTML = `
@@ -305,7 +296,6 @@ async function renderAuth(root) {
   });
 }
 
-
 function renderMainShell(root) {
   root.innerHTML = `<div class="main-content" id="main-view"></div>`;
   renderView();
@@ -329,7 +319,6 @@ const GROUP_LABELS = {
   '3P': 'Pronssiottelu', FIN: 'Finaali',
 };
 
-// Järjestys lohkoille renderöinnissä
 const GROUP_ORDER = {
   A:1, B:2, C:3, D:4, E:5, F:6, G:7, H:8, I:9, J:10, K:11, L:12,
   R32:13, R16:14, QF:15, SF:16, '3P':17, FIN:18,
@@ -516,7 +505,6 @@ function renderBets(el) {
   if (state.filter === 'bet')    filtered = matchList.filter(m =>  state.bets[m.id]);
   if (state.filter === 'unbet')  filtered = matchList.filter(m => !isLocked(m) && !state.bets[m.id] && !m.tbd);
 
-  // Ryhmitä lohkoittain
   const groups = {};
   filtered.forEach(m => {
     const g = m.group_name || m.g;
@@ -571,7 +559,6 @@ function renderBets(el) {
 
   startCountdown();
 
-  // Kiinnitetään goal-inputtien event-handlerit
   el.querySelectorAll('.goal-input').forEach(inp => {
     inp.addEventListener('change', () => handleGoalInput(inp));
     inp.addEventListener('input',  () => handleGoalInput(inp));
@@ -599,11 +586,9 @@ function handleGoalInput(inp) {
 
 function renderMatchCard(m) {
   const matchId = m.id;
-
   const home = m.home || m.h;
   const away = m.away || m.a;
 
-  // TBD-ottelu — ei vielä veikattavissa
   if (m.tbd) {
     return `
       <div class="match-card locked tbd-match" id="card-${matchId}">
@@ -963,7 +948,6 @@ async function renderOthers(el) {
     return;
   }
 
-  // Ryhmitä käyttäjittäin
   const byUser = {};
   allBets.forEach(b => {
     if (!byUser[b.user_id]) byUser[b.user_id] = { name: b.profiles?.display_name || '?', bets: {} };
@@ -986,20 +970,37 @@ async function renderOthers(el) {
       .sort(([a],[b]) => (GROUP_ORDER[a]??99) - (GROUP_ORDER[b]??99))
       .map(([g,ms]) => {
         const rows = ms.map(m => {
-          const chips = Object.values(byUser).map(u => {
+          const mData = getMatchData(m.id);
+
+          const chips = Object.entries(byUser).map(([userId, u]) => {
             const b = u.bets[m.id];
             if (!b) return '';
             const cls = { '1': 'r1', 'x': 'rx', '2': 'r2' }[b.prediction];
-            const isMe = Object.keys(byUser).find(id => byUser[id] === u) === state.user?.id;
+            const isMe = userId === state.user?.id;
+            const ptsObj = mData?.result ? calcPoints(b, mData) : null;
+            const ptsCls = ptsObj
+              ? ptsObj.points >= 4 ? 'other-chip-pts pts-4'
+              : ptsObj.points >= 3 ? 'other-chip-pts pts-3'
+              : ptsObj.points >= 2 ? 'other-chip-pts pts-2'
+              : ptsObj.points >= 1 ? 'other-chip-pts pts-1'
+              : 'other-chip-pts pts-0'
+              : '';
+            const ptsHtml = ptsObj != null ? `<span class="${ptsCls}">${ptsObj.points}p</span>` : '';
             return `<div class="other-chip">
               <span class="other-chip-name">${isMe ? u.name : shortName(u.name)}</span>
-              <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>
+              <span class="other-chip-bet bet-result-badge ${cls}">${b.prediction.toUpperCase()} ${b.home_goals}–${b.away_goals}</span>${ptsHtml}
             </div>`;
           }).filter(Boolean).join('');
+
           if (!chips) return '';
+
+          const resultStr = mData?.result && mData.home_goals != null
+            ? ` <span class="others-result">${mData.home_goals}–${mData.away_goals}</span>`
+            : '';
+
           return `
             <div class="others-match">
-              <div class="others-match-title">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a} <span class="others-date">${fmtDate(m.dt||m.kickoff)}</span></div>
+              <div class="others-match-title">${flagImg(m.home||m.h)}${m.home||m.h} – ${flagImg(m.away||m.a)}${m.away||m.a}${resultStr} <span class="others-date">${fmtDate(m.dt||m.kickoff)}</span></div>
               <div class="others-grid">${chips}</div>
             </div>`;
         }).filter(Boolean).join('');
@@ -1021,7 +1022,6 @@ window.app = {
     if (!name) { toast('Syötä nimesi', true); return; }
     if (!/^\d{4}$/.test(pin)) { toast('PIN-koodi on 4 numeroa', true); return; }
 
-    // Tarkista lukitus
     const lockUntil = parseInt(localStorage.getItem(LOCKOUT_KEY) || '0');
     if (Date.now() < lockUntil) {
       const secs = Math.ceil((lockUntil - Date.now()) / 1000);
@@ -1040,7 +1040,6 @@ window.app = {
     clearTimeout(timeout);
 
     if (err) {
-      // Laske epäonnistuneet yritykset
       const attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0') + 1;
       if (attempts >= MAX_ATTEMPTS) {
         localStorage.setItem(LOCKOUT_KEY, String(Date.now() + LOCKOUT_MS));
@@ -1137,7 +1136,6 @@ function dismissKoBanner() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
-  // Tarkista sessio ensin — estää login-sivun välähtämisen F5:llä
   const { data: { session: existing } } = await sb.auth.getSession();
   if (existing) {
     state.user = existing.user;
@@ -1148,9 +1146,8 @@ async function init() {
   renderAll();
   if (state.user) showKoBanner();
 
-  // Kuuntele myöhempiä auth-muutoksia (kirjautuminen, uloskirjautuminen)
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'INITIAL_SESSION') return; // Hoidettu yllä
+    if (event === 'INITIAL_SESSION') return;
     state.user = session?.user || null;
 
     if (state.user) {
@@ -1165,12 +1162,10 @@ async function init() {
     if (state.user) showKoBanner();
   });
 
-  // Päivitä lock-tilanne 60s välein
   setInterval(() => {
     if (state.user && state.view === 'bets') renderView();
   }, 60_000);
 
-  // Hae tuoreet ottelutulokset Supabasesta 5 min välein
   setInterval(async () => {
     if (!state.user) return;
     await loadMatches();
