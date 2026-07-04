@@ -142,7 +142,7 @@ function regularTimeScore(comp, homeTeamId) {
   let hg = 0, ag = 0;
   for (const d of (comp.details || [])) {
     const typeText = (d.type?.text || '').toLowerCase();
-    const isGoal = typeText.startsWith('goal') || typeText === 'own goal' || typeText.includes('penalty');
+    const isGoal = typeText.startsWith('goal') || typeText === 'own goal';
     if (!isGoal) continue;
     // "90+5:00" → parseInt = 90, jatkoajan "105:00" → 105, rankkarit ilman kelloa → NaN
     const min = parseInt((d.clock?.displayValue || '').split(':')[0]);
