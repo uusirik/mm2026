@@ -148,9 +148,8 @@ function regularTimeScore(comp, homeTeamId) {
     const min = parseInt((d.clock?.displayValue || '').split(':')[0]);
     if (isNaN(min) || min > 90) continue;
     const isHome = d.team?.id === homeTeamId;
-    const isOwn  = typeText === 'own goal';
-    if (isOwn) { if (isHome) ag++; else hg++; }
-    else       { if (isHome) hg++; else ag++; }
+    // ESPN: own goal -tapahtumassa team = hyötyjä (ei virheentekijä) → käsitellään normaalisti
+    if (isHome) hg++; else ag++;
   }
   return { hg, ag };
 }
