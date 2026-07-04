@@ -322,6 +322,9 @@ async function main() {
 
   let updatedResults = 0;
 
+  // Vain aktiiviset ottelut sallitaan tulospäivitykseen — ei ylikirjoiteta vanhoja
+  const activeMatchIds = new Set(activeMatches.map(m => m.id));
+
   for (const event of events) {
     const comp = event.competitions?.[0];
     if (!comp) continue;
@@ -339,6 +342,7 @@ async function main() {
 
     const sbM = sbIndex.get(`${homeFi}|${awayFi}`);
     if (!sbM) { console.warn(`  Ei vastaavuutta: ${homeFi} – ${awayFi}`); continue; }
+    if (!activeMatchIds.has(sbM.id)) continue;
 
     const completed  = event.status?.type?.completed;
     const inProgress = event.status?.type?.state === 'in';
