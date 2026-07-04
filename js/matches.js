@@ -184,6 +184,21 @@ export function calcPoints(bet, match) {
   }
 }
 
+// YLE Fudistietäjä -pisteytys
+export function calcPointsYLE(bet, match) {
+  if (!match.result) return { points: null, label: null };
+  const correctResult = bet.prediction === match.result;
+  const correctHome   = bet.home_goals === match.home_goals;
+  const correctAway   = bet.away_goals === match.away_goals;
+  if (correctResult && correctHome && correctAway) return { points: 30, label: 'Täysin oikein' };
+  let pts = 0;
+  const parts = [];
+  if (correctResult) { pts += 10; parts.push('Lopputulos'); }
+  if (correctHome)   { pts += 5;  parts.push('Kotimaalit'); }
+  if (correctAway)   { pts += 5;  parts.push('Vierasmaalit'); }
+  return { points: pts, label: parts.length ? parts.join(' + ') : 'Ei osumia' };
+}
+
 export function isLocked(match) {
   if (match.tbd) return true;
   const dt = match.kickoff || match.dt;

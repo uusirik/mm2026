@@ -1,6 +1,6 @@
 // app.js — pääsovellus
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { MATCHES, calcPoints, isLocked, fmtDate, matchResult } from './matches.js';
+import { MATCHES, calcPoints, calcPointsYLE, isLocked, fmtDate, matchResult } from './matches.js';
 
 // ─── Konfiguraatio ───────────────────────────────────────────────────────────
 const SUPABASE_URL  = 'https://hwomgxbxcyrrjcwgjgtj.supabase.co';
@@ -22,6 +22,8 @@ let state = {
   news: null,
   saveQueue: {},
   saveTimers: {},
+  scoringMode: 'default',
+  allBets: null,
 };
 
 // ─── Joukkueiden liput ────────────────────────────────────────────────────────
@@ -810,6 +812,11 @@ function renderStakesRows(matchId) {
 }
 
 // ─── Pistetaulukko ────────────────────────────────────────────────────────────
+function setScoringMode(mode) {
+  state.scoringMode = mode;
+  renderView();
+}
+
 async function renderLeaderboard(el) {
   if (!state.leaderboard.length) {
     loadLeaderboard().then(() => renderView());
@@ -817,26 +824,67 @@ async function renderLeaderboard(el) {
     return;
   }
 
-  const rows = state.leaderboard.map((row, i) => {
-    const isMe = row.user_id === state.user?.id;
-    const rankCls = i < 3 ? 'top3' : '';
-    return `
-      <div class="lb-row">
-        <span class="lb-rank ${rankCls}">${i+1}.</span>
-        <span class="lb-name ${isMe?'me':''}">${shortName(row.display_name)}</span>
-        <span class="lb-num">${row.bets_placed}</span>
-        <span class="lb-num">${row.exact_results}</span>
-        <span class="lb-points">${row.total_points} p</span>
-      </div>`;
-  }).join('');
+  const isYLE = state.scoringMode === 'yle';
+
+  const toggleHtml = `
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:11px;color:var(--text3)">Pisteytys</span>
+      <div class="sort-toggle">
+        <button class="sort-mode-btn${!isYLE?' active':''}" onclick="app.setScoringMode('default')">Oma</button>
+        <button class="sort-mode-btn${isYLE?' active':''}" onclick="app.setScoringMode('yle')">YLE</button>
+      </div>
+    </div>`;
+
+  // Pääleaderboard-taulukko
+  let rows;
+  if (isYLE && state.allBets) {
+    const completedM = state.matches.filter(m => m.result);
+    const totals = {};
+    state.allBets.forEach(b => {
+      const m = completedM.find(m => m.id === b.match_id);
+      if (!m) return;
+      const { points } = calcPointsYLE(b, m);
+      if (points === null) return;
+      if (!totals[b.user_id]) totals[b.user_id] = { name: b.profiles?.display_name || '?', pts: 0, exact: 0 };
+      totals[b.user_id].pts += points;
+      if (points === 30) totals[b.user_id].exact++;
+    });
+    const yleLb = Object.entries(totals)
+      .map(([uid, d]) => ({ user_id: uid, display_name: d.name, total_points: d.pts, exact_results: d.exact }))
+      .sort((a, b) => b.total_points - a.total_points);
+    rows = yleLb.map((row, i) => {
+      const isMe = row.user_id === state.user?.id;
+      return `
+        <div class="lb-row">
+          <span class="lb-rank ${i < 3 ? 'top3' : ''}">${i+1}.</span>
+          <span class="lb-name ${isMe?'me':''}">${shortName(row.display_name)}</span>
+          <span class="lb-num">–</span>
+          <span class="lb-num">${row.exact_results}</span>
+          <span class="lb-points">${row.total_points} p</span>
+        </div>`;
+    }).join('');
+  } else {
+    rows = state.leaderboard.map((row, i) => {
+      const isMe = row.user_id === state.user?.id;
+      return `
+        <div class="lb-row">
+          <span class="lb-rank ${i < 3 ? 'top3' : ''}">${i+1}.</span>
+          <span class="lb-name ${isMe?'me':''}">${shortName(row.display_name)}</span>
+          <span class="lb-num">${row.bets_placed}</span>
+          <span class="lb-num">${row.exact_results}</span>
+          <span class="lb-points">${row.total_points} p</span>
+        </div>`;
+    }).join('');
+  }
 
   el.innerHTML = `
+    ${toggleHtml}
     <div class="leaderboard">
       <div class="lb-header">
         <span>#</span>
         <span>Pelaaja</span>
         <span style="text-align:center">Veikkaukset</span>
-        <span style="text-align:center">Tarkat</span>
+        <span style="text-align:center">${isYLE ? '30p' : 'Tarkat'}</span>
         <span style="text-align:right">Pisteet</span>
       </div>
       ${rows || '<div class="loading">Ei tietoja vielä.</div>'}
@@ -846,8 +894,14 @@ async function renderLeaderboard(el) {
   const completedMatches = state.matches.filter(m => m.result).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
   if (!completedMatches.length) return;
 
-  const { data: allBets } = await sb.from('bets').select('*, profiles(id,display_name)');
-  if (!allBets) return;
+  if (!state.allBets) {
+    const { data } = await sb.from('bets').select('*, profiles(id,display_name)');
+    state.allBets = data;
+    if (!data) return;
+    // Jos YLE-tila oli jo päällä → uudelleenrenderöi taulukko nyt kun data on saatavilla
+    if (isYLE) { renderView(); return; }
+  }
+  const allBets = state.allBets;
 
   const byUser = {};
   allBets.forEach(b => {
@@ -856,18 +910,28 @@ async function renderLeaderboard(el) {
   });
 
   const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#a78bfa','#38bdf8','#fb923c','#94a3b8','#f472b6','#34d399'];
+  const calcFn = isYLE ? calcPointsYLE : calcPoints;
 
   const breakdown = Object.values(byUser).map(u => {
-    const c = { p4:0, p3:0, p2:0, p1:0, p0:0 };
+    const c = isYLE
+      ? { p30:0, p20:0, p15:0, p10:0, p5:0, p0:0 }
+      : { p4:0, p3:0, p2:0, p1:0, p0:0 };
     completedMatches.forEach(m => {
       const b = u.bets[m.id];
       if (!b) return;
-      const { points } = calcPoints(b, m);
+      const { points } = calcFn(b, m);
       if (points === null) return;
-      c[`p${points}`] = (c[`p${points}`] || 0) + 1;
+      if (isYLE) {
+        const key = points >= 25 ? 'p30' : points >= 20 ? 'p20' : points >= 15 ? 'p15' : points >= 10 ? 'p10' : points >= 5 ? 'p5' : 'p0';
+        c[key]++;
+      } else {
+        c[`p${points}`] = (c[`p${points}`] || 0) + 1;
+      }
     });
     return { ...c, name: shortName(u.name), isMe: u.id === state.user?.id };
-  }).sort((a, b) => (b.p4*4+b.p3*3+b.p2*2+b.p1) - (a.p4*4+a.p3*3+a.p2*2+a.p1));
+  }).sort((a, b) => isYLE
+    ? (b.p30*30+b.p20*20+b.p15*15+b.p10*10+b.p5*5) - (a.p30*30+a.p20*20+a.p15*15+a.p10*10+a.p5*5)
+    : (b.p4*4+b.p3*3+b.p2*2+b.p1) - (a.p4*4+a.p3*3+a.p2*2+a.p1));
 
   const labels = ['Start', ...completedMatches.map(m => {
     const d = new Date(m.kickoff);
@@ -881,7 +945,7 @@ async function renderLeaderboard(el) {
       label: shortName(u.name),
       data: [0, ...completedMatches.map(m => {
         const b = u.bets[m.id];
-        if (b) cum += calcPoints(b, m).points || 0;
+        if (b) cum += calcFn(b, m).points || 0;
         return cum;
       })],
       borderColor: COLORS[idx % COLORS.length],
@@ -898,31 +962,30 @@ async function renderLeaderboard(el) {
   if (!extrasEl) return;
 
   const hdStyle = 'text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;padding:0 4px';
-  const cell = (val, pts) => {
-    let s = 'text-align:center;display:block;font-size:13px;';
-    if (val === 0) s += 'color:var(--text3)';
-    else if (pts === 4) s += 'color:var(--green);font-weight:700';
-    else if (pts === 3) s += 'color:var(--indigo);font-weight:600';
-    else if (pts === 2) s += 'color:var(--amber)';
-    else s += 'color:var(--text2)';
+  const cell = (val, color) => {
+    const s = `text-align:center;display:block;font-size:13px;${val === 0 ? 'color:var(--text3)' : `color:${color};font-weight:${val>0?'600':'400'}`}`;
     return `<span style="${s}">${val > 0 ? val : '–'}</span>`;
   };
+
+  const brkHeaders = isYLE
+    ? ['30p','15-25p','10p','5p','0p'].map(h => `<span style="${hdStyle};color:var(--text2)">${h}</span>`).join('')
+    : `<span style="${hdStyle};color:var(--green)">4p</span><span style="${hdStyle};color:var(--indigo)">3p</span><span style="${hdStyle};color:var(--amber)">2p</span><span style="${hdStyle};color:var(--text2)">1p</span><span style="${hdStyle};color:var(--text3)">0p</span>`;
+
+  const brkRow = r => isYLE
+    ? [cell(r.p30,'var(--green)'), cell((r.p20||0)+(r.p15||0),'var(--indigo)'), cell(r.p10,'var(--amber)'), cell(r.p5,'var(--text2)'), cell(r.p0,'var(--text3)')].join('')
+    : [cell(r.p4,'var(--green)'), cell(r.p3,'var(--indigo)'), cell(r.p2,'var(--amber)'), cell(r.p1,'var(--text2)'), cell(r.p0,'var(--text3)')].join('');
 
   extrasEl.innerHTML = `
     <div class="lb-card" style="margin-top:0.75rem">
       <div class="lb-card-title">Miten pisteet muodostuu</div>
       <div style="display:grid;grid-template-columns:1fr 44px 44px 44px 44px 44px;padding:0.5rem 1rem 0.4rem;gap:2px;border-bottom:1px solid var(--border)">
         <span style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em">Pelaaja</span>
-        <span style="${hdStyle};color:var(--green)">4p</span>
-        <span style="${hdStyle};color:var(--indigo)">3p</span>
-        <span style="${hdStyle};color:var(--amber)">2p</span>
-        <span style="${hdStyle};color:var(--text2)">1p</span>
-        <span style="${hdStyle};color:var(--text3)">0p</span>
+        ${brkHeaders}
       </div>
       ${breakdown.map(r => `
         <div style="display:grid;grid-template-columns:1fr 44px 44px 44px 44px 44px;padding:6px 1rem;gap:2px;border-bottom:1px solid var(--border);${r.isMe?'background:var(--surface2)':''}">
           <span style="font-size:13px;font-weight:${r.isMe?'600':'400'};color:var(--text)">${r.name}${r.isMe?' <span style="color:var(--indigo);font-size:11px">(sinä)</span>':''}</span>
-          ${cell(r.p4,4)}${cell(r.p3,3)}${cell(r.p2,2)}${cell(r.p1,1)}${cell(r.p0,0)}
+          ${brkRow(r)}
         </div>`).join('')}
     </div>
     <div class="lb-card" style="margin-top:0.75rem;padding:1rem">
@@ -1164,6 +1227,7 @@ window.app = {
   },
 
   dismissKoBanner,
+  setScoringMode,
 
   setSortMode(mode) {
     state.sortMode = mode;
