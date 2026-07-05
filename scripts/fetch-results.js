@@ -222,7 +222,7 @@ async function updateKnockoutMatches(events, sbIndex, sbMatches) {
     if (koIndex.has(key) || koIndex.has(keyRev)) {
       // Pari jo olemassa — päivitä kickoff jos se on väärä
       const existing = koIndex.get(key) || koIndex.get(keyRev);
-      if (existing.kickoff !== event.date) {
+            if (new Date(existing.kickoff).getTime() !== new Date(event.date).getTime()) {
         console.log(`  🕐 Päivitä kickoff ${existing.id}: ${homeFi}–${awayFi} → ${event.date}`);
         await patchMatch(existing.id, { kickoff: event.date });
         existing.kickoff = event.date;
