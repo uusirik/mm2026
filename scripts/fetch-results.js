@@ -181,8 +181,8 @@ function knockoutRound(dateStr) {
   const t = new Date(dateStr).getTime();
   const d = (y, m, day, h = 0) => Date.UTC(y, m - 1, day, h);
   if (t >= d(2026,6,29)     && t < d(2026,7,4,12))  return 'R32';
-  if (t >= d(2026,7,4,12)   && t < d(2026,7,10))    return 'R16';
-  if (t >= d(2026,7,11)     && t < d(2026,7,13))    return 'QF';
+  if (t >= d(2026,7,4,12)   && t < d(2026,7,9))     return 'R16';
+  if (t >= d(2026,7,9)      && t < d(2026,7,14))    return 'QF';
   if (t >= d(2026,7,14)     && t < d(2026,7,17))    return 'SF';
   if (t >= d(2026,7,18)     && t < d(2026,7,19))    return '3P';
   if (t >= d(2026,7,19))                             return 'FIN';
